@@ -381,14 +381,16 @@ def replayAudits(url, usr, pwd, selection, audits, waitTime):
     # Will do this by querying the API Docs and Regexing Classes
     page = session.get('/doc/html/LeftSummary.html')
     tree = html.fromstring(page.content)
-    print dir(tree)
+
+    # Get List of All Classes from the Documentation
+    classEntries = tree.xpath('//a[starts-with(@href, "MO")]/text()')
 
     classes = {}
-    namespace = re.finditer('target="classFrame">(?P<key>vz|fv):(?P<value>\w+)', tree)
-    for item in namespace:
-            classes[item.group("key")] = item.group("value")
+    for entry in classEntries:
+        namespace = re.search("(?P<key>vz|fv):(?P<value>\w+)", entry)
+        if namespace is not None:
+            classes[namespace.group("value")] = namespace.group("key") + namespace.group("value")
 
-    print classes
 
     for entry in audits:
         if selection == "2":
@@ -408,31 +410,187 @@ def replayAudits(url, usr, pwd, selection, audits, waitTime):
                 time.sleep(wait)
 
         if selection == "3":
+            #prettyPrint =  json.dumps(entry, indent=2)
+            #print prettyPrint
             if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion:":
-                #r2 = re.search("uni\/tn-(?P<tn>\w+)\/ctx-(?P<vrf>[^\]\/]+)\]", entry["aaaModLR"]["attributes"]["dn"])
                 r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
                 if r2 is not None:
-                        attributes = {}
-                        r3 = re.finditer("(?P<key>\w+):(?P<value>\w+)", entry["aaaModLR"]["attributes"]["changeSet"])
-                        for m in r3:
-                            attributes[m.group("key")] = m.group("value")
+                    attributes = {}
+                    r3 = re.finditer("(?P<key>\w+):(?P<value>\w+)", entry["aaaModLR"]["attributes"]["changeSet"])
+                    for m in r3:
+                        attributes[m.group("key")] = m.group("value")
+                    r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
+                    if r4.group("class") in classes:
+                        className =  classes[r4.group("class")]
 
-                        #url = "/api/mo/uni/" + "tn-" + r2.group("tn") + "/" + "ctx-" + r2.group("vrf") + ".json"
-                        url = "/api/mo/" + r2.group("url") + ".json"
-                        if "deleted" in entry["aaaModLR"]["attributes"]["descr"]:
-                            data = {"fvCtx":{"attributes":{"status":"deleted"}}}
-                        elif "created" in entry["aaaModLR"]["attributes"]["descr"]:
-                            data = {"fvCtx":{"attributes":attributes}}
+                    url = "/api/mo/" + r2.group("url") + ".json"
+                    if "deleted" in entry["aaaModLR"]["attributes"]["descr"]:
+                        data = {className:{"attributes":{"status":"deleted"}}}
+                    elif "created" in entry["aaaModLR"]["attributes"]["descr"]:
+                        data = {className:{"attributes":attributes}}
 
-                        #print url, data
-                        POST = session.push_to_apic(url, data)
-                        if POST is None or not resp.ok:
-                            logger.error("failed to login with cert credentials")
-                            return None
-                        time.sleep(wait)
+                    #print url, data
+                    POST = session.push_to_apic(url, data)
+                    if POST is None or not resp.ok:
+                        logger.error("failed to login with cert credentials")
+                        return None
+                    time.sleep(wait)
 
+        if selection == "4":
+            #prettyPrint =  json.dumps(entry, indent=2)
+            #print prettyPrint
+            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion:":
+                r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
+                if r2 is not None:
+                    attributes = {}
+                    r3 = re.finditer("(?P<key>\w+):(?P<value>\w+)", entry["aaaModLR"]["attributes"]["changeSet"])
+                    for m in r3:
+                        attributes[m.group("key")] = m.group("value")
+                    r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
+                    if r4.group("class") in classes:
+                        className =  classes[r4.group("class")]
 
+                    url = "/api/mo/" + r2.group("url") + ".json"
+                    if "deleted" in entry["aaaModLR"]["attributes"]["descr"]:
+                        data = {className:{"attributes":{"status":"deleted"}}}
+                    elif "created" in entry["aaaModLR"]["attributes"]["descr"]:
+                        data = {className:{"attributes":attributes}}
 
+                    #print url, data
+                    POST = session.push_to_apic(url, data)
+                    if POST is None or not resp.ok:
+                        logger.error("failed to login with cert credentials")
+                        return None
+                    time.sleep(wait)
+
+        if selection == "5":
+            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion:":
+                r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
+                if r2 is not None:
+                    attributes = {}
+                    r3 = re.finditer("(?P<key>[^:, ]+):(?P<value>[^,]+)", entry["aaaModLR"]["attributes"]["changeSet"])
+                    for m in r3:
+                        attributes[m.group("key")] = m.group("value")
+                    r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
+                    if r4.group("class") in classes:
+                        className =  classes[r4.group("class")]
+
+                    url = "/api/mo/" + r2.group("url") + ".json"
+                    if "deleted" in entry["aaaModLR"]["attributes"]["descr"]:
+                        data = {className:{"attributes":{"status":"deleted"}}}
+                    elif "created" in entry["aaaModLR"]["attributes"]["descr"]:
+                        data = {className:{"attributes":attributes}}
+
+                    #print url, data
+                    POST = session.push_to_apic(url, data)
+                    if POST is None or not resp.ok:
+                        logger.error("failed to login with cert credentials")
+                        return None
+                    time.sleep(wait)
+
+        if selection == "6":
+            prettyPrint =  json.dumps(entry, indent=2)
+            print prettyPrint
+            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion:":
+                r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
+                if r2 is not None:
+                    attributes = {}
+                    r3 = re.finditer("(?P<key>[^:, ]+):(?P<value>[^,]+)", entry["aaaModLR"]["attributes"]["changeSet"])
+                    for m in r3:
+                        attributes[m.group("key")] = m.group("value")
+                    r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
+                    if r4.group("class") in classes:
+                        className =  classes[r4.group("class")]
+
+                    url = "/api/mo/" + r2.group("url") + ".json"
+                    if "deleted" in entry["aaaModLR"]["attributes"]["descr"]:
+                        data = {className:{"attributes":{"status":"deleted"}}}
+                    elif "created" in entry["aaaModLR"]["attributes"]["descr"]:
+                        data = {className:{"attributes":attributes}}
+
+                    #print url, data
+                    POST = session.push_to_apic(url, data)
+                    if POST is None or not resp.ok:
+                        logger.error("failed to login with cert credentials")
+                        return None
+                    time.sleep(wait)
+
+        if selection == "7":
+            prettyPrint =  json.dumps(entry, indent=2)
+            print prettyPrint
+            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion:":
+                r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
+                if r2 is not None:
+                    attributes = {}
+                    r3 = re.finditer("(?P<key>[^:, ]+):(?P<value>[^,]+)", entry["aaaModLR"]["attributes"]["changeSet"])
+                    for m in r3:
+                        attributes[m.group("key")] = m.group("value")
+                    r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
+                    if r4.group("class") in classes:
+                        className =  classes[r4.group("class")]
+
+                    url = "/api/mo/" + r2.group("url") + ".json"
+                    if "deleted" in entry["aaaModLR"]["attributes"]["descr"]:
+                        data = {className:{"attributes":{"status":"deleted"}}}
+                    elif "created" in entry["aaaModLR"]["attributes"]["descr"]:
+                        data = {className:{"attributes":attributes}}
+
+                    #print url, data
+                    POST = session.push_to_apic(url, data)
+                    if POST is None or not resp.ok:
+                        logger.error("failed to login with cert credentials")
+                        return None
+                    time.sleep(wait)
+
+        if selection == "8":
+            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion:":
+                r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
+                if r2 is not None:
+                    attributes = {}
+                    r3 = re.finditer("(?P<key>[^:, ]+):(?P<value>[^,]+)", entry["aaaModLR"]["attributes"]["changeSet"])
+                    for m in r3:
+                        attributes[m.group("key")] = m.group("value")
+                    r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
+                    if r4.group("class") in classes:
+                        className =  classes[r4.group("class")]
+
+                    url = "/api/mo/" + r2.group("url") + ".json"
+                    if "deleted" in entry["aaaModLR"]["attributes"]["descr"]:
+                        data = {className:{"attributes":{"status":"deleted"}}}
+                    elif "created" in entry["aaaModLR"]["attributes"]["descr"]:
+                        data = {className:{"attributes":attributes}}
+
+                    #print url, data
+                    POST = session.push_to_apic(url, data)
+                    if POST is None or not resp.ok:
+                        logger.error("failed to login with cert credentials")
+                        return None
+                    time.sleep(wait)
+
+        if selection == "9":
+            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion:":
+                r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
+                if r2 is not None:
+                    attributes = {}
+                    r3 = re.finditer("(?P<key>[^:, ]+):(?P<value>[^,]+)", entry["aaaModLR"]["attributes"]["changeSet"])
+                    for m in r3:
+                        attributes[m.group("key")] = m.group("value")
+                    r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
+                    if r4.group("class") in classes:
+                        className =  classes[r4.group("class")]
+
+                    url = "/api/mo/" + r2.group("url") + ".json"
+                    if "deleted" in entry["aaaModLR"]["attributes"]["descr"]:
+                        data = {className:{"attributes":{"status":"deleted"}}}
+                    elif "created" in entry["aaaModLR"]["attributes"]["descr"]:
+                        data = {className:{"attributes":attributes}}
+
+                    #print url, data
+                    POST = session.push_to_apic(url, data)
+                    if POST is None or not resp.ok:
+                        logger.error("failed to login with cert credentials")
+                        return None
+                    time.sleep(wait)
 
 
 
@@ -462,8 +620,8 @@ def main(file, ip, username, password, https, port, waitTime):
 
     }
 
-    prettyPrint =  json.dumps(allTN, indent=2)
-    print prettyPrint
+    #prettyPrint =  json.dumps(allTN, indent=2)
+    #print prettyPrint
 
     print "[1]: All Global Tenant Config"
     print "[2]: All Tenant Config"
