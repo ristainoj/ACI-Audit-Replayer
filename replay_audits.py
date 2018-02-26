@@ -184,8 +184,10 @@ def jsonParser(file):
     print "The Total number of Changes:                        %s" % totalEntries
 
     #Sort Audit Entries by Created Date/Time: Oldest --> Newest
-    dateSorted = sorted(parsed["imdata"], key=lambda d: d["aaaModLR"]["attributes"]["created"])
-    #dateSorted = reversed(list(parsed))
+    #dateSorted = sorted(parsed["imdata"], key=lambda d: d["aaaModLR"]["attributes"]["created"])
+    dateSorted = []
+    for i in range(int(totalEntries) - 1, 0, -1):
+        dateSorted.append(parsed["imdata"][i])
 
     #Pretty Print the JSON
     #prettyPrint =  json.dumps(dateSorted, indent=2)
@@ -200,6 +202,7 @@ def getTotals(dateSorted):
     #Total Global Tenant Objects
     all = []
     for entry in dateSorted:
+        print entry
         r1 = re.search("uni\/(?P<gltn>tn-)", entry["aaaModLR"]["attributes"]["dn"])
         try:
             if r1.group("gltn") in entry["aaaModLR"]["attributes"]["dn"]:
@@ -388,16 +391,51 @@ def replayAudits(url, usr, pwd, selection, audits, waitTime):
 
     classes = {}
     for entry in classEntries:
-        namespace = re.search("(?P<key>vz|fv):(?P<value>\w+)", entry)
+        namespace = re.search("(?P<key>vz|fv|vmm|l3ext|l2ext):(?P<value>\w+)", entry)
         if namespace is not None:
             classes[namespace.group("value")] = namespace.group("key") + namespace.group("value")
 
 
     for entry in audits:
+        if selection == "1":
+            prettyPrint =  json.dumps(entry, indent=2)
+            print prettyPrint
+            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion":
+                r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
+                if r2 is not None:
+                    attributes = {}
+                    r3 = re.finditer("(?P<key>[^:, ]+):(?P<value>[^,]+)", entry["aaaModLR"]["attributes"]["changeSet"])
+                    for m in r3:
+                        attributes[m.group("key")] = m.group("value")
+                    r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
+                    if r4.group("class") in classes:
+                        className =  classes[r4.group("class")]
+                        print className
+                    # Since we are checking the "desc" for object name, "Subnet"
+                    # could be fvSubnet or l3extSubnet
+                    if "BD" in entry["aaaModLR"]["attributes"]["dn"] and "subnet" in entry["aaaModLR"]["attributes"]["dn"]:
+                        className = "fvSubnet"
+                    elif "instP" in entry["aaaModLR"]["attributes"]["dn"] and "extsubnet" in entry["aaaModLR"]["attributes"]["dn"]:
+                        className = "l3extSubnet"
+
+                    url = "/api/mo/" + r2.group("url") + ".json"
+
+                    if "deleted" in entry["aaaModLR"]["attributes"]["descr"]:
+                        data = {className:{"attributes":{"status":"deleted"}}}
+                    elif "created" in entry["aaaModLR"]["attributes"]["descr"]:
+                        data = {className:{"attributes":attributes}}
+
+                    #print url, data
+                    POST = session.push_to_apic(url, data)
+                    if POST is None or not resp.ok:
+                        logger.error("failed to login with cert credentials")
+                        return None
+                    time.sleep(wait)
+
         if selection == "2":
-            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion:":
-                r2 = re.search("tn-(?P<tn>.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
-                url = "/api/mo/uni/" + "tn-" + r2.group("tn") + ".json"
+            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion":
+                r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
+                url = "/api/mo/" + r2.group("url") + ".json"
                 if "deleted" in entry["aaaModLR"]["attributes"]["descr"]:
                     data = {"fvTenant":{"attributes":{"status":"deleted"}}}
                 elif "created" in entry["aaaModLR"]["attributes"]["descr"]:
@@ -413,11 +451,11 @@ def replayAudits(url, usr, pwd, selection, audits, waitTime):
         if selection == "3":
             #prettyPrint =  json.dumps(entry, indent=2)
             #print prettyPrint
-            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion:":
+            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion":
                 r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
                 if r2 is not None:
                     attributes = {}
-                    r3 = re.finditer("(?P<key>\w+):(?P<value>\w+)", entry["aaaModLR"]["attributes"]["changeSet"])
+                    r3 = re.finditer("(?P<key>[^:, ]+):(?P<value>[^,]+)", entry["aaaModLR"]["attributes"]["changeSet"])
                     for m in r3:
                         attributes[m.group("key")] = m.group("value")
                     r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
@@ -438,13 +476,13 @@ def replayAudits(url, usr, pwd, selection, audits, waitTime):
                     time.sleep(wait)
 
         if selection == "4":
-            #prettyPrint =  json.dumps(entry, indent=2)
-            #print prettyPrint
-            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion:":
+            prettyPrint =  json.dumps(entry, indent=2)
+            print prettyPrint
+            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion":
                 r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
                 if r2 is not None:
                     attributes = {}
-                    r3 = re.finditer("(?P<key>\w+):(?P<value>\w+)", entry["aaaModLR"]["attributes"]["changeSet"])
+                    r3 = re.finditer("(?P<key>[^:, ]+):(?P<value>[^,]+)", entry["aaaModLR"]["attributes"]["changeSet"])
                     for m in r3:
                         attributes[m.group("key")] = m.group("value")
                     r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
@@ -457,7 +495,7 @@ def replayAudits(url, usr, pwd, selection, audits, waitTime):
                     elif "created" in entry["aaaModLR"]["attributes"]["descr"]:
                         data = {className:{"attributes":attributes}}
 
-                    #print url, data
+                    print url, data
                     POST = session.push_to_apic(url, data)
                     if POST is None or not resp.ok:
                         logger.error("failed to login with cert credentials")
@@ -465,7 +503,7 @@ def replayAudits(url, usr, pwd, selection, audits, waitTime):
                     time.sleep(wait)
 
         if selection == "5":
-            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion:":
+            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion":
                 r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
                 if r2 is not None:
                     attributes = {}
@@ -492,7 +530,7 @@ def replayAudits(url, usr, pwd, selection, audits, waitTime):
         if selection == "6":
             prettyPrint =  json.dumps(entry, indent=2)
             print prettyPrint
-            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion:":
+            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion":
                 r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
                 if r2 is not None:
                     attributes = {}
@@ -519,7 +557,7 @@ def replayAudits(url, usr, pwd, selection, audits, waitTime):
         if selection == "7":
             prettyPrint =  json.dumps(entry, indent=2)
             print prettyPrint
-            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion:":
+            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion":
                 r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
                 if r2 is not None:
                     attributes = {}
@@ -544,7 +582,7 @@ def replayAudits(url, usr, pwd, selection, audits, waitTime):
                     time.sleep(wait)
 
         if selection == "8":
-            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion:":
+            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion":
                 r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
                 if r2 is not None:
                     attributes = {}
@@ -569,7 +607,7 @@ def replayAudits(url, usr, pwd, selection, audits, waitTime):
                     time.sleep(wait)
 
         if selection == "9":
-            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion:":
+            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion":
                 r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
                 if r2 is not None:
                     attributes = {}
@@ -605,7 +643,8 @@ def main(file, ip, username, password, https, port, waitTime):
     #getUserInfo(url, usr, pwd)
 
     dateSorted = jsonParser(file)
-    print dateSorted
+    #prettyPrint =  json.dumps(dateSorted, indent=2)
+    #print prettyPrint
 
     all, allTN, allVrf, allL3Out, allApp, allEPG, allBD, allCon, allFlt = getTotals(dateSorted)
 
@@ -622,8 +661,7 @@ def main(file, ip, username, password, https, port, waitTime):
 
     }
 
-    #prettyPrint =  json.dumps(allTN, indent=2)
-    #print prettyPrint
+
 
     print "[1]: All Global Tenant Config"
     print "[2]: All Tenant Config"
