@@ -185,6 +185,7 @@ def jsonParser(file):
 
     #Sort Audit Entries by Created Date/Time: Oldest --> Newest
     dateSorted = sorted(parsed["imdata"], key=lambda d: d["aaaModLR"]["attributes"]["created"])
+    #dateSorted = reversed(list(parsed))
 
     #Pretty Print the JSON
     #prettyPrint =  json.dumps(dateSorted, indent=2)
@@ -604,6 +605,7 @@ def main(file, ip, username, password, https, port, waitTime):
     #getUserInfo(url, usr, pwd)
 
     dateSorted = jsonParser(file)
+    print dateSorted
 
     all, allTN, allVrf, allL3Out, allApp, allEPG, allBD, allCon, allFlt = getTotals(dateSorted)
 
@@ -642,6 +644,7 @@ def main(file, ip, username, password, https, port, waitTime):
 
 
     replayAudits(url, usr, pwd, selection, selections[selection], waitTime)
+
 
 if __name__ == "__main__":
     import argparse
