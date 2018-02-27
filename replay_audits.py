@@ -186,12 +186,8 @@ def jsonParser(file):
     #Sort Audit Entries by Created Date/Time: Oldest --> Newest
     #dateSorted = sorted(parsed["imdata"], key=lambda d: d["aaaModLR"]["attributes"]["created"])
     dateSorted = []
-    for i in range(int(totalEntries) - 1, 0, -1):
+    for i in range(int(totalEntries)-1, -1, -1):
         dateSorted.append(parsed["imdata"][i])
-
-    #Pretty Print the JSON
-    #prettyPrint =  json.dumps(dateSorted, indent=2)
-    #print prettyPrint
 
     return dateSorted
 
@@ -202,93 +198,76 @@ def getTotals(dateSorted):
     #Total Global Tenant Objects
     all = []
     for entry in dateSorted:
-        print entry
         r1 = re.search("uni\/(?P<gltn>tn-)", entry["aaaModLR"]["attributes"]["dn"])
-        try:
+        if r1 is not None:
             if r1.group("gltn") in entry["aaaModLR"]["attributes"]["dn"]:
                 all.append(entry)
-        except:
-            continue
+
 
     #Total Tenant Objects
     allTN = []
     for entry in dateSorted:
         r1 = re.search("uni\/tn-(?P<tn>[^\]\/]+)\]", entry["aaaModLR"]["attributes"]["dn"])
-        try:
+        if r1 is not None:
             if r1.group("tn") in entry["aaaModLR"]["attributes"]["dn"]:
                 allTN.append(entry)
-        except:
-            continue
+
 
     #Total VRF Objects
     allVrf = []
     for entry in dateSorted:
         r1 = re.search("uni\/tn-.*\/(?P<vrf>ctx-)", entry["aaaModLR"]["attributes"]["dn"])
-        try:
+        if r1 is not None:
             if r1.group("vrf") in entry["aaaModLR"]["attributes"]["dn"]:
                 allVrf.append(entry)
-        except:
-            continue
 
     #Total L3Out Objects
     allL3Out = []
     for entry in dateSorted:
         r1 = re.search("uni\/tn-.*\/(?P<l3>out-)", entry["aaaModLR"]["attributes"]["dn"])
-        try:
+        if r1 is not None:
             if r1.group("l3") in entry["aaaModLR"]["attributes"]["dn"]:
                 allL3Out.append(entry)
-        except:
-            continue
 
     #Total App Profile Objects
     allApp = []
     for entry in dateSorted:
         r1 = re.search("uni\/tn-.*\/ap-(?P<app>[^\]/]+)\]", entry["aaaModLR"]["attributes"]["dn"])
-        try:
+        if r1 is not None:
             if r1.group("app") in entry["aaaModLR"]["attributes"]["dn"]:
                 allApp.append(entry)
-        except:
-            continue
 
     #Total EPG Objects
     allEPG = []
     for entry in dateSorted:
         r1 = re.search("uni\/tn-.*\/(?P<epg>epg-)", entry["aaaModLR"]["attributes"]["dn"])
-        try:
+        if r1 is not None:
             if r1.group("epg") in entry["aaaModLR"]["attributes"]["dn"]:
                 allEPG.append(entry)
-        except:
-            continue
 
     #Total BD Objects
     allBD = []
     for entry in dateSorted:
         r1 = re.search("uni\/tn-.*\/(?P<bd>BD-)", entry["aaaModLR"]["attributes"]["dn"])
-        try:
+        if r1 is not None:
             if r1.group("bd") in entry["aaaModLR"]["attributes"]["dn"]:
                 allBD.append(entry)
-        except:
-            continue
 
     #Total Contract Objects
     allCon = []
     for entry in dateSorted:
         r1 = re.search("uni\/tn-.*\/(?P<con>brc-)", entry["aaaModLR"]["attributes"]["dn"])
-        try:
+        if r1 is not None:
             if r1.group("con") in entry["aaaModLR"]["attributes"]["dn"]:
                 allCon.append(entry)
-        except:
-            continue
 
     #Total Filter Objects
     allFlt = []
     for entry in dateSorted:
         r1 = re.search("uni\/tn-.*\/(?P<flt>flt-)", entry["aaaModLR"]["attributes"]["dn"])
-        try:
+        if r1 is not None:
             if r1.group("flt") in entry["aaaModLR"]["attributes"]["dn"]:
                 allFlt.append(entry)
-        except:
-            continue
 
     print "The Total number of Global Tenant Config Changes:   %s" % len(all)
     print "The Total number of Tenant Config Changes:          %s" % len(allTN)
@@ -367,7 +346,7 @@ def env_setup(ip, usr, pwd, https, port):
 
     return url, usr, pwd
 
-def replayAudits(url, usr, pwd, selection, audits, waitTime):
+def replayAudits(url, usr, pwd, selection, audits, waitTime, step):
 
     if waitTime is not None:
         wait = int(waitTime)
@@ -389,49 +368,102 @@ def replayAudits(url, usr, pwd, selection, audits, waitTime):
     # Get List of All Classes from the Documentation
     classEntries = tree.xpath('//a[starts-with(@href, "MO")]/text()')
 
+    # Append Namespace to Class Name and Dictionary Them
     classes = {}
     for entry in classEntries:
         namespace = re.search("(?P<key>vz|fv|vmm|l3ext|l2ext):(?P<value>\w+)", entry)
         if namespace is not None:
             classes[namespace.group("value")] = namespace.group("key") + namespace.group("value")
 
-
     for entry in audits:
-        if selection == "1":
-            prettyPrint =  json.dumps(entry, indent=2)
-            print prettyPrint
-            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion":
-                r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
-                if r2 is not None:
-                    attributes = {}
-                    r3 = re.finditer("(?P<key>[^:, ]+):(?P<value>[^,]+)", entry["aaaModLR"]["attributes"]["changeSet"])
-                    for m in r3:
-                        attributes[m.group("key")] = m.group("value")
-                    r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
-                    if r4.group("class") in classes:
-                        className =  classes[r4.group("class")]
-                        print className
-                    # Since we are checking the "desc" for object name, "Subnet"
-                    # could be fvSubnet or l3extSubnet
-                    if "BD" in entry["aaaModLR"]["attributes"]["dn"] and "subnet" in entry["aaaModLR"]["attributes"]["dn"]:
-                        className = "fvSubnet"
-                    elif "instP" in entry["aaaModLR"]["attributes"]["dn"] and "extsubnet" in entry["aaaModLR"]["attributes"]["dn"]:
-                        className = "l3extSubnet"
+        #if selection == "1":
+        prettyPrint =  json.dumps(entry, indent=2)
+        print prettyPrint
+        if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion":
+            r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
+            if r2 is not None:
+                attributes = {}
+                r3 = re.finditer("(?P<key>[^:, ]+):(?P<value>[^,]+)", entry["aaaModLR"]["attributes"]["changeSet"])
+                for m in r3:
+                    attributes[m.group("key")] = m.group("value")
+                r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
+                if r4.group("class") in classes:
+                    className =  classes[r4.group("class")]
 
-                    url = "/api/mo/" + r2.group("url") + ".json"
+                # Since we are checking the "desc" for object name, "Subnet"
+                # could be fvSubnet or l3extSubnet.  Need to be specific.
+                if "BD" in entry["aaaModLR"]["attributes"]["dn"] and "subnet" in entry["aaaModLR"]["attributes"]["dn"]:
+                    className = "fvSubnet"
+                elif "instP" in entry["aaaModLR"]["attributes"]["dn"] and "extsubnet" in entry["aaaModLR"]["attributes"]["dn"]:
+                    className = "l3extSubnet"
 
-                    if "deleted" in entry["aaaModLR"]["attributes"]["descr"]:
-                        data = {className:{"attributes":{"status":"deleted"}}}
-                    elif "created" in entry["aaaModLR"]["attributes"]["descr"]:
-                        data = {className:{"attributes":attributes}}
+                url = "/api/mo/" + r2.group("url") + ".json"
 
-                    #print url, data
-                    POST = session.push_to_apic(url, data)
-                    if POST is None or not resp.ok:
-                        logger.error("failed to login with cert credentials")
-                        return None
-                    time.sleep(wait)
+                if "deleted" in entry["aaaModLR"]["attributes"]["descr"]:
+                    data = {className:{"attributes":{"status":"deleted"}}}
+                elif "created" in entry["aaaModLR"]["attributes"]["descr"]:
+                    data = {className:{"attributes":attributes}}
 
+                # Send POST to APIC with Audit Data
+                POST = session.push_to_apic(url, data)
+                if not POST.ok:
+                    print "POST was not Successful with:"
+                    print "%s to:" % data
+                    print "%s" % url
+                else:
+                    print "Got 200 OK From POST with:"
+                    print "%s to:" % data
+                    print "%s" % url
+
+
+                time.sleep(wait)
+
+                # If Stepping is enabled, prompt for user input before
+                # proceeding to the next entry
+                # don't prompt on last entry
+                if entry != audits[len(audits)-1]:
+                    if step != None:
+                        user_input = None
+                        while user_input == None:
+                            user_input = raw_input( "Press Enter to Continue        : ")
+                            if len(user_input) != 0:
+                                print "Please press Enter to Continue"
+
+        elif entry["aaaModLR"]["attributes"]["ind"] == "modification":
+            r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
+            if r2 is not None:
+                attributes = {}
+                r3 = re.finditer("(?P<key>[^:, ]+) \(Old: [^,]+, New:(?P<value>[^\)]+)", entry["aaaModLR"]["attributes"]["changeSet"])
+                for m in r3:
+                    attributes[m.group("key")] = m.group("value")
+                r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
+                if r4.group("class") in classes:
+                    className =  classes[r4.group("class")]
+                url = "/api/mo/" + r2.group("url") + ".json"
+                data = {className:{"attributes":attributes}}
+
+                POST = session.push_to_apic(url, data)
+                if not POST.ok:
+                    print "POST was not Successful with:"
+                    print "%s to:" % data
+                    print "%s" % url
+                else:
+                    print "Got 200 OK From POST with:"
+                    print "%s to:" % data
+                    print "%s" % url
+                time.sleep(wait)
+
+                # If Stepping is enabled, prompt for user input before
+                # proceeding to the next entry
+                # don't prompt on last entry
+                if entry != audits[len(audits)-1]:
+                    if step != None:
+                        user_input = None
+                        while user_input == None:
+                            user_input = raw_input( "Press Enter to Continue        : ")
+                            if len(user_input) != 0:
+                                print "Please press Enter to Continue"
+        """
         if selection == "2":
             if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion":
                 r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
@@ -495,6 +527,24 @@ def replayAudits(url, usr, pwd, selection, audits, waitTime):
                     elif "created" in entry["aaaModLR"]["attributes"]["descr"]:
                         data = {className:{"attributes":attributes}}
 
+                    print url, data
+                    POST = session.push_to_apic(url, data)
+                    if POST is None or not resp.ok:
+                        logger.error("failed to login with cert credentials")
+                        return None
+                    time.sleep(wait)
+            elif entry["aaaModLR"]["attributes"]["ind"] == "modification":
+                r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
+                if r2 is not None:
+                    attributes = {}
+                    r3 = re.finditer("(?P<key>[^:, ]+) \(Old: [^,]+, New:(?P<value>[^\)]+)", entry["aaaModLR"]["attributes"]["changeSet"])
+                    for m in r3:
+                        attributes[m.group("key")] = m.group("value")
+                    r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
+                    if r4.group("class") in classes:
+                        className =  classes[r4.group("class")]
+                    url = "/api/mo/" + r2.group("url") + ".json"
+                    data = {className:{"attributes":attributes}}
                     print url, data
                     POST = session.push_to_apic(url, data)
                     if POST is None or not resp.ok:
@@ -631,10 +681,10 @@ def replayAudits(url, usr, pwd, selection, audits, waitTime):
                         return None
                     time.sleep(wait)
 
+"""
 
 
-
-def main(file, ip, username, password, https, port, waitTime):
+def main(file, ip, username, password, https, port, waitTime, step):
 
     # Get Connection Info From User for APIC
     url, usr, pwd = env_setup(ip, username, password, https, port)
@@ -646,7 +696,9 @@ def main(file, ip, username, password, https, port, waitTime):
     #prettyPrint =  json.dumps(dateSorted, indent=2)
     #print prettyPrint
 
+
     all, allTN, allVrf, allL3Out, allApp, allEPG, allBD, allCon, allFlt = getTotals(dateSorted)
+
 
     selections = {
         "1": all,
@@ -658,10 +710,7 @@ def main(file, ip, username, password, https, port, waitTime):
         "7": allBD,
         "8": allCon,
         "9": allFlt
-
     }
-
-
 
     print "[1]: All Global Tenant Config"
     print "[2]: All Tenant Config"
@@ -681,8 +730,7 @@ def main(file, ip, username, password, https, port, waitTime):
             selection = None
 
 
-    replayAudits(url, usr, pwd, selection, selections[selection], waitTime)
-
+    replayAudits(url, usr, pwd, selection, selections[selection], waitTime, step)
 
 if __name__ == "__main__":
     import argparse
@@ -698,6 +746,7 @@ if __name__ == "__main__":
     parser.add_argument("--https", action="store_true", dest="https",help="Specifies whether to use HTTPS authentication", default=None)
     parser.add_argument("--port", action="store", dest="port",help="port number to use for APIC communicaton", default=None)
     parser.add_argument("--waitTime", action="store", dest="time",help="Time in seconds to wait between changes", default=None)
+    parser.add_argument("--step", action="store_true", dest="step",help="Prompt For User input between each step", default=None)
     parser.add_argument("--debug", action="store", help="debug level", dest="debug", default="ERROR")
     args = parser.parse_args()
 
@@ -719,5 +768,5 @@ if __name__ == "__main__":
     if args.debug == "WARN": logger.setLevel(logging.WARN)
     if args.debug == "ERROR": logger.setLevel(logging.ERROR)
 
-    main(args.file, args.ip, args.username, args.password, args.https, args.port, args.time)
+    main(args.file, args.ip, args.username, args.password, args.https, args.port, args.time, args.step)
 
