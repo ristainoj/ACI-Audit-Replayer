@@ -23,9 +23,10 @@ domTypes = {
     }
 """
 reMapObjects = [
-        "rsdomAtt",
+        "rsdomAtt-[uni/phy",
+        "rsdomAtt-[uni/vmmp-VMware",
         "rsl3DomAtt",
-        "RspathAtt",
+        "rspathAtt",
         "rspathL3OutAtt",
         "Member",
         "rsnodeL3OutAtt"
@@ -771,14 +772,32 @@ def env_setup(ip, usr, pwd, https, port):
     return session
 
 def reMap(entry, vmmDom=False, phyDom=False, port=False, l3Dom=False, l3If=False, l3PC=False, l3SVI=False):
-    print "Object Needs to be Re-Mapped"
 
-    print entry
+    if reMapObjects[0] in entry["aaaModLR"]["attributes"]["dn"]:
+        entry["aaaModLR"]["attributes"]["dn"] = re.sub("rsdomAtt-\[[^]]+\]", "rsdomAtt-[%s]" % phyDom, entry["aaaModLR"]["attributes"]["dn"])
+        entry["aaaModLR"]["attributes"]["changeSet"] = re.sub("tDn:[^ ,]+", "tDn:%s" % phyDom, entry["aaaModLR"]["attributes"]["changeSet"])
+        entry["aaaModLR"]["attributes"]["affected"] = re.sub("rsdomAtt-\[[^]]+\]", "rsdomAtt-[%s]" % phyDom, entry["aaaModLR"]["attributes"]["affected"])
+        entry["aaaModLR"]["attributes"]["descr"] = re.sub("uni.*(?=\s)", phyDom, entry["aaaModLR"]["attributes"]["descr"])
+    if reMapObjects[1] in entry["aaaModLR"]["attributes"]["dn"]:
+        entry["aaaModLR"]["attributes"]["dn"] = re.sub("rsdomAtt-\[[^]]+\]", "rsdomAtt-[%s]" % vmmDom, entry["aaaModLR"]["attributes"]["dn"])
+        entry["aaaModLR"]["attributes"]["changeSet"] = re.sub("tDn:[^ ,]+", "tDn:%s" % vmmDom, entry["aaaModLR"]["attributes"]["changeSet"])
+        entry["aaaModLR"]["attributes"]["affected"] = re.sub("rsdomAtt-\[[^]]+\]", "rsdomAtt-[%s]" % vmmDom, entry["aaaModLR"]["attributes"]["affected"])
+        entry["aaaModLR"]["attributes"]["descr"] = re.sub("uni.*(?=\s)", vmmDom, entry["aaaModLR"]["attributes"]["descr"])
+    if reMapObjects[2] in entry["aaaModLR"]["attributes"]["dn"]:
+        entry["aaaModLR"]["attributes"]["changeSet"] = re.sub("tDn:[^ ,]+", "tDn:%s" % l3Dom, entry["aaaModLR"]["attributes"]["changeSet"])
+    if reMapObjects[3] in entry["aaaModLR"]["attributes"]["dn"]:
+        entry["aaaModLR"]["attributes"]["dn"] = re.sub("rspathAtt-\[[^]]+\]", "rspathAtt-[%s" % port, entry["aaaModLR"]["attributes"]["dn"])
+        entry["aaaModLR"]["attributes"]["changeSet"] = re.sub("tDn:[^ ,]+", "tDn:%s" % port, entry["aaaModLR"]["attributes"]["changeSet"])
+        entry["aaaModLR"]["attributes"]["affected"] = re.sub("rspathAtt-\[[^]]+\]", "rspathAtt-[%s" % port, entry["aaaModLR"]["attributes"]["affected"])
+        entry["aaaModLR"]["attributes"]["descr"] = re.sub("topology.*(?=\s)", port, entry["aaaModLR"]["attributes"]["descr"])
+
+    print "Object Needs to be Re-Mapped To:"
+    prettyPrint =  json.dumps(entry, indent=2)
+    print prettyPrint
 
     return entry
 
 def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3PC, l3VPC):
-
     if waitTime is not None:
         wait = int(waitTime)
     else:
@@ -871,12 +890,12 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3
                         elif l3VPC:
                             entry = reMap(entry, l3Dom, l3VPC)
                         elif (vmm and phys):
-                            entry = reMap(entry, vmmDom, phyDom)
+                            entry = reMap(entry, vmmDom, phyDom, port)
                         elif vmm:
                             entry = reMap(entry, vmmDom)
                         elif phys:
-                            entry = reMap(entry, phyDom)
-
+                            entry = reMap(entry, phyDom, port)
+            r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
             if r2 is not None:
                 attributes = {}
                 r3 = re.finditer("(?P<key>[^:, ]+):(?P<value>[^,]+)", entry["aaaModLR"]["attributes"]["changeSet"])
@@ -976,11 +995,12 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3
                         elif l3VPC:
                             entry = reMap(entry, l3Dom, l3VPC)
                         elif (vmm and phys):
-                            entry = reMap(entry, vmmDom, phyDom)
+                            entry = reMap(entry, vmmDom, phyDom, port)
                         elif vmm:
                             entry = reMap(entry, vmmDom)
                         elif phys:
-                            entry = reMap(entry, phyDom)
+                            entry = reMap(entry, phyDom, port)
+            r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
             if r2 is not None:
                 attributes = {}
                 r3 = re.finditer("(?P<key>[a-zA-Z0-9]+) \(Old:[ ]*(?P<old>.+?) New:[ ]*(?P<new>[^)]*)\)", entry["aaaModLR"]["attributes"]["changeSet"])
