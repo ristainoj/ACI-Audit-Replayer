@@ -28,9 +28,9 @@ reMapObjects = [
         "rsl3DomAtt",
         "rspathAtt",
         "rspathL3OutAtt",
-        "Member",
         "rsnodeL3OutAtt"
     ]
+
 
 def getVMMUserInfo(session):
 
@@ -316,40 +316,44 @@ def getL3UserInfo(session, l3If=False, l3PC=False, l3VPC=False):
         l3If = getL3Int(session)
         l3PC = getL3PC(session)
         l3VPC = getL3VPC(session)
-        return l3Dom, l3If, l3PC, l3VPC
 
     elif type == "If-PC":
         print "Since Routed Ints/SubInts, and PCs are used, we will need to select all options for replacement"
         l3If = getL3Int(session)
         l3PC = getL3PC(session)
-        return l3Dom, l3If, l3PC, ""
+        l3VPC = False
 
     elif type == "If-VPC":
         print "Since Routed Ints/SubInts, and VPCs are used, we will need to select all options for replacement"
         l3If = getL3Int(session)
+        l3PC = False
         l3VPC = getL3VPC(session)
-        return l3Dom, l3If, "", l3VPC
 
     elif type == "If":
         print "Since Routed Ints/SubInts are used, we will need to select all options for replacement"
         l3If = getL3Int(session)
-        return l3Dom, l3If, "", ""
+        l3PC = False
+        l3VPC = False
 
     elif type == "PC-SVI":
         print "Since PCs and VPCs are used, we will need to select all options for replacement"
+        l3If = False
         l3PC = getL3PC(session)
         l3VPC = getL3VPC(session)
-        return l3Dom, "", l3PC, l3VPC
 
     elif type == "PC":
         print "Since PCs are used, we will need to select which PC for replacement"
+        l3If = False
         l3PC = getL3PC(session)
-        return l3Dom, "", l3PC, ""
+        l3VPC = False
 
     elif type == "VPC":
         print "Since VPCs are used, we will need to select which VPC to use for replacement"
+        l3If = False
+        l3PC = False
         l3VPC = getL3VPC(session)
-        return l3Dom, "", "", l3VPC
+
+    return l3Dom, l3If, l3PC, l3VPC
 
 
 def getL3PC(session):
@@ -771,7 +775,7 @@ def env_setup(ip, usr, pwd, https, port):
 
     return session
 
-def reMap(entry, vmmDom=False, phyDom=False, port=False, l3Dom=False, l3If=False, l3PC=False, l3SVI=False):
+def reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC):
 
     if reMapObjects[0] in entry["aaaModLR"]["attributes"]["dn"]:
         entry["aaaModLR"]["attributes"]["dn"] = re.sub("rsdomAtt-\[[^]]+\]", "rsdomAtt-[%s]" % phyDom, entry["aaaModLR"]["attributes"]["dn"])
@@ -790,6 +794,42 @@ def reMap(entry, vmmDom=False, phyDom=False, port=False, l3Dom=False, l3If=False
         entry["aaaModLR"]["attributes"]["changeSet"] = re.sub("tDn:[^ ,]+", "tDn:%s" % port, entry["aaaModLR"]["attributes"]["changeSet"])
         entry["aaaModLR"]["attributes"]["affected"] = re.sub("rspathAtt-\[[^]]+\]", "rspathAtt-[%s" % port, entry["aaaModLR"]["attributes"]["affected"])
         entry["aaaModLR"]["attributes"]["descr"] = re.sub("topology.*(?=\s)", port, entry["aaaModLR"]["attributes"]["descr"])
+    if reMapObjects[4] in entry["aaaModLR"]["attributes"]["dn"]:
+        if l3If:
+            r2 = re.search("(?P<l3if>rspathL3OutAtt-.*(?=pathep)pathep-\[eth1\/)", entry["aaaModLR"]["attributes"]["dn"])
+            if r2 is not None:
+                if r2.group("l3if") in entry ["aaaModLR"]["attributes"]["dn"]:
+                    entry["aaaModLR"]["attributes"]["dn"] = re.sub("rspathL3OutAtt-\[[^]]+\]", "rspathL3OutAtt-[%s" % l3If, entry["aaaModLR"]["attributes"]["dn"])
+                    entry["aaaModLR"]["attributes"]["changeSet"] = re.sub("tDn:[^ ,]+", "tDn:%s" % l3If, entry["aaaModLR"]["attributes"]["changeSet"])
+                    entry["aaaModLR"]["attributes"]["affected"] = re.sub("rspathL3OutAtt-\[[^]]+\]", "rspathL3OutAtt-[%s" % l3If, entry["aaaModLR"]["attributes"]["affected"])
+        if l3PC:
+            r3 = re.search("(?P<l3PC>rspathL3OutAtt-\[topology\/pod-[0-9]+\/paths-(?P<node>[0-9]+)\/pathep-\[[^eth1\/]+)", entry["aaaModLR"]["attributes"]["dn"])
+            if r3 is not None:
+                if r3.group("l3PC") in entry ["aaaModLR"]["attributes"]["dn"]:
+                    entry["aaaModLR"]["attributes"]["dn"] = re.sub("rspathL3OutAtt-\[[^]]+\]", "rspathL3OutAtt-[%s" % l3PC, entry["aaaModLR"]["attributes"]["dn"])
+                    entry["aaaModLR"]["attributes"]["changeSet"] = re.sub("tDn:[^ ,]+", "tDn:%s" % l3PC, entry["aaaModLR"]["attributes"]["changeSet"])
+                    entry["aaaModLR"]["attributes"]["affected"] = re.sub("rspathL3OutAtt-\[[^]]+\]", "rspathL3OutAtt-[%s" % l3PC, entry["aaaModLR"]["attributes"]["affected"])
+        if l3VPC:
+            r4 = re.search("topology\/pod-(?P<pod>[0-9])\/protpaths-(?P<node1>[0-9]+)\-(?P<node2>[0-9]+)", str(l3VPC))
+            r5 = re.search("(?P<l3VPC>rspathL3OutAtt-.*(?=protpaths)protpaths-(?P<node1>[0-9]+))\-(?P<node2>[0-9]+)", entry["aaaModLR"]["attributes"]["dn"])
+            global pod
+            pod = r4.group("pod")
+            global node1
+            node1 = r4.group("node1")
+            global node2
+            node2 = r4.group("node2")
+            if r5 is not None:
+                if r5.group("l3VPC") in entry ["aaaModLR"]["attributes"]["dn"]:
+                    entry["aaaModLR"]["attributes"]["dn"] = re.sub("rspathL3OutAtt-\[[^]]+\]", "rspathL3OutAtt-[%s" % l3VPC, entry["aaaModLR"]["attributes"]["dn"])
+                    entry["aaaModLR"]["attributes"]["changeSet"] = re.sub("tDn:[^ ,]+", "tDn:%s" % l3VPC, entry["aaaModLR"]["attributes"]["changeSet"])
+                    entry["aaaModLR"]["attributes"]["affected"] = re.sub("rspathL3OutAtt-\[[^]]+\]", "rspathL3OutAtt-[%s" % l3VPC, entry["aaaModLR"]["attributes"]["affected"])
+
+    if reMapObjects[5] in entry["aaaModLR"]["attributes"]["dn"]:
+        if l3VPC:
+            entry["aaaModLR"]["attributes"]["dn"] = re.sub("rsnodeL3OutAtt-\[topology\/pod-[0-9]\/node-[^]]+", "rsnodeL3OutAtt-[topology/pod-%s/node-%s" % (pod, node1), entry["aaaModLR"]["attributes"]["dn"])
+            entry["aaaModLR"]["attributes"]["changeSet"] = re.sub("tDn:topology\/pod-[0-9]\/node-[^ ,]+", "tDn:topology/pod-%s/node-%s" % (pod, node1), entry["aaaModLR"]["attributes"]["changeSet"])
+            entry["aaaModLR"]["attributes"]["affected"] = re.sub("rsnodeL3OutAtt-\[topology\/pod-[0-9]\/node-[^]]+", "rsnodeL3OutAtt-[topology/pod-%s/node-%s" % (pod, node1), entry["aaaModLR"]["attributes"]["affected"])
+            node1 = node2
 
     print "Object Needs to be Re-Mapped To:"
     prettyPrint =  json.dumps(entry, indent=2)
@@ -831,6 +871,15 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3
     if "1" in selection or "4" in selection:
         l3Dom, l3If, l3PC, l3VPC = getL3UserInfo(session, l3If, l3PC, l3VPC)
     else:
+        l3Dom = False
+        l3If = False
+        l3PC = False
+        l3VPC = False
+
+    if "2" in selection or "3" in selection or "5" in selection or "7" in selection or "8" in selection or "9" in selection:
+        vmm = False
+        phys = False
+        l3Dom = False
         l3If = False
         l3PC = False
         l3VPC = False
@@ -846,55 +895,53 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3
                         if (vmm and phys and l3If and l3PC and l3VPC):
                             entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
                         elif (vmm and l3If and l3PC and l3VPC):
-                            entry = reMap(entry, vmmDom, l3Dom, l3If, l3PC, l3VPC)
+                            entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, l3PC, l3VPC)
                         elif (vmm and l3If and l3PC):
-                            entry = reMap(entry, vmmDom, l3Dom, l3If, l3PC)
+                            entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, l3PC, False)
                         elif (vmm and l3If and l3VPC):
-                            entry = reMap(entry, vmmDom, l3Dom, l3If, l3VPC)
+                            entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, False, l3VPC)
                         elif (vmm and l3If):
-                            entry = reMap(entry, vmmDom, l3Dom, l3If)
+                            entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, False, False)
                         elif (vmm and l3PC and l3VPC):
-                            entry = reMap(entry, vmmDom, l3Dom, l3PC, l3VPC)
+                            entry = reMap(entry, vmmDom, False, False, l3Dom, False, l3PC, l3VPC)
                         elif (vmm and l3PC):
-                            entry = reMap(entry, vmmDom, l3Dom, l3PC)
+                            entry = reMap(entry, vmmDom, False, False, l3Dom, False, l3PC, False)
                         elif (vmm and l3VPC):
-                            entry = reMap(entry, vmmDom, l3Dom, l3VPC)
+                            entry = reMap(entry, vmmDom, False, False, l3Dom, False, False, l3VPC)
                         elif (phys and port and l3If and l3PC and l3VPC):
-                            entry = reMap(entry, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
-                        elif (phys and l3If and l3PC and l3VPC):
-                            entry = reMap(entry, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
+                            entry = reMap(entry, False, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
                         elif (phys and l3If and l3PC):
-                            entry = reMap(entry, phyDom, port, l3Dom, l3If, l3PC)
+                            entry = reMap(entry, False, phyDom, port, l3Dom, l3If, l3PC, False)
                         elif (phys and l3If and l3VPC):
-                            entry = reMap(entry, phyDom, port, l3Dom, l3If, l3VPC)
+                            entry = reMap(entry, False, phyDom, port, l3Dom, l3If, False, l3VPC)
                         elif (phys and l3If):
-                            entry = reMap(entry, phyDom, port, l3Dom, l3If)
+                            entry = reMap(entry, False, phyDom, port, l3Dom, l3If, False, False)
                         elif (phys and l3PC and l3VPC):
-                            entry = reMap(entry, phyDom, port, l3Dom, l3PC, l3VPC)
+                            entry = reMap(entry, False, phyDom, port, l3Dom, False, l3PC, l3VPC)
                         elif (phys and l3PC):
-                            entry = reMap(entry, phyDom, port, l3Dom, l3PC)
+                            entry = reMap(entry, False, phyDom, port, l3Dom, False, l3PC, False)
                         elif (phys and l3VPC):
-                            entry = reMap(entry, phyDom, port, l3Dom, l3VPC)
+                            entry = reMap(entry, False, phyDom, port, l3Dom, False, False, l3VPC)
                         elif (l3If and l3PC and l3VPC):
-                            entry = reMap(entry, l3Dom, l3If, l3PC, l3VPC)
+                            entry = reMap(entry, False, False, False, l3Dom, l3If, l3PC, l3VPC)
                         elif (l3If and l3PC):
-                            entry = reMap(entry, l3Dom, l3If, l3PC)
+                            entry = reMap(entry, False, False, False, l3Dom, l3If, l3PC, False)
                         elif (l3If and l3VPC):
-                            entry = reMap(entry, l3Dom, l3If, l3VPC)
+                            entry = reMap(entry, False, False, False, l3Dom, l3If, False, l3VPC)
                         elif l3If:
-                            entry = reMap(entry, l3Dom, l3If)
+                            entry = reMap(entry, False, False, False, l3Dom, l3If, False, False)
                         elif (l3PC and l3VPC):
-                            entry = reMap(entry, l3Dom, l3PC, l3VPC)
+                            entry = reMap(entry, False, False, False, l3Dom, False, l3PC, l3VPC)
                         elif l3PC:
-                            entry = reMap(entry, l3Dom, l3PC)
+                            entry = reMap(entry, False, False, False, l3Dom, False, l3PC, False)
                         elif l3VPC:
-                            entry = reMap(entry, l3Dom, l3VPC)
+                            entry = reMap(entry, False, False, False, l3Dom, False, False, l3VPC)
                         elif (vmm and phys):
-                            entry = reMap(entry, vmmDom, phyDom, port)
+                            entry = reMap(entry, vmmDom, phyDom, port, False, False, False, False)
                         elif vmm:
-                            entry = reMap(entry, vmmDom)
+                            entry = reMap(entry, vmmDom, False, False, False, False, False, False)
                         elif phys:
-                            entry = reMap(entry, phyDom, port)
+                            entry = reMap(entry, False, phyDom, port, False, False, False, False)
             r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
             if r2 is not None:
                 attributes = {}
@@ -951,55 +998,53 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3
                         if (vmm and phys and l3If and l3PC and l3VPC):
                             entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
                         elif (vmm and l3If and l3PC and l3VPC):
-                            entry = reMap(entry, vmmDom, l3Dom, l3If, l3PC, l3VPC)
+                            entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, l3PC, l3VPC)
                         elif (vmm and l3If and l3PC):
-                            entry = reMap(entry, vmmDom, l3Dom, l3If, l3PC)
+                            entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, l3PC, False)
                         elif (vmm and l3If and l3VPC):
-                            entry = reMap(entry, vmmDom, l3Dom, l3If, l3VPC)
+                            entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, False, l3VPC)
                         elif (vmm and l3If):
-                            entry = reMap(entry, vmmDom, l3Dom, l3If)
+                            entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, False, False)
                         elif (vmm and l3PC and l3VPC):
-                            entry = reMap(entry, vmmDom, l3Dom, l3PC, l3VPC)
+                            entry = reMap(entry, vmmDom, False, False, l3Dom, False, l3PC, l3VPC)
                         elif (vmm and l3PC):
-                            entry = reMap(entry, vmmDom, l3Dom, l3PC)
+                            entry = reMap(entry, vmmDom, False, False, l3Dom, False, l3PC, False)
                         elif (vmm and l3VPC):
-                            entry = reMap(entry, vmmDom, l3Dom, l3VPC)
+                            entry = reMap(entry, vmmDom, False, False, l3Dom, False, False, l3VPC)
                         elif (phys and port and l3If and l3PC and l3VPC):
-                            entry = reMap(entry, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
-                        elif (phys and l3If and l3PC and l3VPC):
-                            entry = reMap(entry, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
+                            entry = reMap(entry, False, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
                         elif (phys and l3If and l3PC):
-                            entry = reMap(entry, phyDom, port, l3Dom, l3If, l3PC)
+                            entry = reMap(entry, False, phyDom, port, l3Dom, l3If, l3PC, False)
                         elif (phys and l3If and l3VPC):
-                            entry = reMap(entry, phyDom, port, l3Dom, l3If, l3VPC)
+                            entry = reMap(entry, False, phyDom, port, l3Dom, l3If, False, l3VPC)
                         elif (phys and l3If):
-                            entry = reMap(entry, phyDom, port, l3Dom, l3If)
+                            entry = reMap(entry, False, phyDom, port, l3Dom, l3If, False, False)
                         elif (phys and l3PC and l3VPC):
-                            entry = reMap(entry, phyDom, port, l3Dom, l3PC, l3VPC)
+                            entry = reMap(entry, False, phyDom, port, l3Dom, False, l3PC, l3VPC)
                         elif (phys and l3PC):
-                            entry = reMap(entry, phyDom, port, l3Dom, l3PC)
+                            entry = reMap(entry, False, phyDom, port, l3Dom, False, l3PC, False)
                         elif (phys and l3VPC):
-                            entry = reMap(entry, phyDom, port, l3Dom, l3VPC)
+                            entry = reMap(entry, False, phyDom, port, l3Dom, False, False, l3VPC)
                         elif (l3If and l3PC and l3VPC):
-                            entry = reMap(entry, l3Dom, l3If, l3PC, l3VPC)
+                            entry = reMap(entry, False, False, False, l3Dom, l3If, l3PC, l3VPC)
                         elif (l3If and l3PC):
-                            entry = reMap(entry, l3Dom, l3If, l3PC)
+                            entry = reMap(entry, False, False, False, l3Dom, l3If, l3PC, False)
                         elif (l3If and l3VPC):
-                            entry = reMap(entry, l3Dom, l3If, l3VPC)
+                            entry = reMap(entry, False, False, False, l3Dom, l3If, False, l3VPC)
                         elif l3If:
-                            entry = reMap(entry, l3Dom, l3If)
+                            entry = reMap(entry, False, False, False, l3Dom, l3If, False, False)
                         elif (l3PC and l3VPC):
-                            entry = reMap(entry, l3Dom, l3PC, l3VPC)
+                            entry = reMap(entry, False, False, False, l3Dom, False, l3PC, l3VPC)
                         elif l3PC:
-                            entry = reMap(entry, l3Dom, l3PC)
+                            entry = reMap(entry, False, False, False, l3Dom, False, l3PC, False)
                         elif l3VPC:
-                            entry = reMap(entry, l3Dom, l3VPC)
+                            entry = reMap(entry, False, False, False, l3Dom, False, False, l3VPC)
                         elif (vmm and phys):
-                            entry = reMap(entry, vmmDom, phyDom, port)
+                            entry = reMap(entry, vmmDom, phyDom, port, False, False, False, False)
                         elif vmm:
-                            entry = reMap(entry, vmmDom)
+                            entry = reMap(entry, vmmDom, False, False, False, False, False, False)
                         elif phys:
-                            entry = reMap(entry, phyDom, port)
+                            entry = reMap(entry, False, phyDom, port, False, False, False, False)
             r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
             if r2 is not None:
                 attributes = {}
