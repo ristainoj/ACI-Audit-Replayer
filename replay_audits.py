@@ -1229,6 +1229,8 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, port, l3
                                 user_input = raw_input( "Press Enter to Continue        : ")
                                 if len(user_input) != 0:
                                     print "Please press Enter to Continue"
+        except KeyboardInterrupt:
+            sys.exit(1)
         except:
             import traceback
             print traceback.format_exc()
