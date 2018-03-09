@@ -1206,17 +1206,13 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, port, l3
 
                     POST = session.push_to_apic(url, data)
                     if not POST.ok:
-                        badPost = []
                         print "POST was not Successful with:"
                         print "%s to:" % data
                         print "%s" % url
-                        badPost.append(entry)
                     else:
-                        goodPost = []
                         print "Got 200 OK From POST with:"
                         print "%s to:" % data
                         print "%s" % url
-                        goodPost.append(entry)
                     time.sleep(wait)
 
                     # If Stepping is enabled, prompt for user input before
