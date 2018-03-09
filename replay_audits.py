@@ -995,238 +995,240 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, port, l3
         l3Dom = False
         l3If = False
         l3PC = False
-        l3VPC = False
-
+        l3V
+        PC = False
     for entry in audits:
-        #if selection == "1":
-        prettyPrint =  json.dumps(entry, indent=2)
-        print prettyPrint
-        if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion":
-            r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
-            for object in range(0, len(reMapObjects)):
-                    if reMapObjects[object] in r2.group("url"):
-                        if (vmm and phys and l3If and l3PC and l3VPC):
-                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
-                        elif (vmm and phys and l3If and l3PC):
-                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, False)
-                        elif (vmm and phys and l3If and l3VPC):
-                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, False, l3VPC)
-                        elif (vmm and phys and l3If):
-                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, False, False)
-                        elif (vmm and phys and l3PC and l3VPC):
-                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, False, l3PC, l3VPC)
-                        elif (vmm and phys and l3PC):
-                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, False, l3PC, False)
-                        elif (vmm and phys and l3VPC):
-                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, False, False, l3VPC)
-                        elif (vmm and phys):
-                            entry = reMap(entry, vmmDom, phyDom, port, False, False, False, False)
-                        elif (vmm and l3If and l3PC and l3VPC):
-                            entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, l3PC, l3VPC)
-                        elif (vmm and l3If and l3PC):
-                            entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, l3PC, False)
-                        elif (vmm and l3If and l3VPC):
-                            entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, False, l3VPC)
-                        elif (vmm and l3If):
-                            entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, False, False)
-                        elif (vmm and l3PC and l3VPC):
-                            entry = reMap(entry, vmmDom, False, False, l3Dom, False, l3PC, l3VPC)
-                        elif (vmm and l3PC):
-                            entry = reMap(entry, vmmDom, False, False, l3Dom, False, l3PC, False)
-                        elif (vmm and l3VPC):
-                            entry = reMap(entry, vmmDom, False, False, l3Dom, False, False, l3VPC)
-                        elif (phys and port and l3If and l3PC and l3VPC):
-                            entry = reMap(entry, False, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
-                        elif (phys and l3If and l3PC):
-                            entry = reMap(entry, False, phyDom, port, l3Dom, l3If, l3PC, False)
-                        elif (phys and l3If and l3VPC):
-                            entry = reMap(entry, False, phyDom, port, l3Dom, l3If, False, l3VPC)
-                        elif (phys and l3If):
-                            entry = reMap(entry, False, phyDom, port, l3Dom, l3If, False, False)
-                        elif (phys and l3PC and l3VPC):
-                            entry = reMap(entry, False, phyDom, port, l3Dom, False, l3PC, l3VPC)
-                        elif (phys and l3PC):
-                            entry = reMap(entry, False, phyDom, port, l3Dom, False, l3PC, False)
-                        elif (phys and l3VPC):
-                            entry = reMap(entry, False, phyDom, port, l3Dom, False, False, l3VPC)
-                        elif (l3If and l3PC and l3VPC):
-                            entry = reMap(entry, False, False, False, l3Dom, l3If, l3PC, l3VPC)
-                        elif (l3If and l3PC):
-                            entry = reMap(entry, False, False, False, l3Dom, l3If, l3PC, False)
-                        elif (l3If and l3VPC):
-                            entry = reMap(entry, False, False, False, l3Dom, l3If, False, l3VPC)
-                        elif l3If:
-                            entry = reMap(entry, False, False, False, l3Dom, l3If, False, False)
-                        elif (l3PC and l3VPC):
-                            entry = reMap(entry, False, False, False, l3Dom, False, l3PC, l3VPC)
-                        elif l3PC:
-                            entry = reMap(entry, False, False, False, l3Dom, False, l3PC, False)
-                        elif l3VPC:
-                            entry = reMap(entry, False, False, False, l3Dom, False, False, l3VPC)
-                        elif (vmm and phys):
-                            entry = reMap(entry, vmmDom, phyDom, port, False, False, False, False)
-                        elif vmm:
-                            entry = reMap(entry, vmmDom, False, False, False, False, False, False)
-                        elif phys:
-                            entry = reMap(entry, False, phyDom, port, False, False, False, False)
-            r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
-            if r2 is not None:
-                attributes = {}
-                r3 = re.finditer("(?P<key>[^:, ]+):(?P<value>[^,]+)", entry["aaaModLR"]["attributes"]["changeSet"])
-                for m in r3:
-                    attributes[m.group("key")] = m.group("value")
-                #r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
-                code = re.sub("^E","", entry["aaaModLR"]["attributes"]["code"])
-                if code in codes:
-                    className = codes[code]
-                else:
-                    print "Could not find Audit Code (%s) in Code List.  Are you running the same version as Audits?"%(
-                        code)
-                    sys.exit()
+        try:
+            #if selection == "1":
+            prettyPrint =  json.dumps(entry, indent=2)
+            print prettyPrint
+            if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion":
+                r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
+                for object in range(0, len(reMapObjects)):
+                        if reMapObjects[object] in r2.group("url"):
+                            if (vmm and phys and l3If and l3PC and l3VPC):
+                                entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
+                            elif (vmm and phys and l3If and l3PC):
+                                entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, False)
+                            elif (vmm and phys and l3If and l3VPC):
+                                entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, False, l3VPC)
+                            elif (vmm and phys and l3If):
+                                entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, False, False)
+                            elif (vmm and phys and l3PC and l3VPC):
+                                entry = reMap(entry, vmmDom, phyDom, port, l3Dom, False, l3PC, l3VPC)
+                            elif (vmm and phys and l3PC):
+                                entry = reMap(entry, vmmDom, phyDom, port, l3Dom, False, l3PC, False)
+                            elif (vmm and phys and l3VPC):
+                                entry = reMap(entry, vmmDom, phyDom, port, l3Dom, False, False, l3VPC)
+                            elif (vmm and phys):
+                                entry = reMap(entry, vmmDom, phyDom, port, False, False, False, False)
+                            elif (vmm and l3If and l3PC and l3VPC):
+                                entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, l3PC, l3VPC)
+                            elif (vmm and l3If and l3PC):
+                                entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, l3PC, False)
+                            elif (vmm and l3If and l3VPC):
+                                entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, False, l3VPC)
+                            elif (vmm and l3If):
+                                entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, False, False)
+                            elif (vmm and l3PC and l3VPC):
+                                entry = reMap(entry, vmmDom, False, False, l3Dom, False, l3PC, l3VPC)
+                            elif (vmm and l3PC):
+                                entry = reMap(entry, vmmDom, False, False, l3Dom, False, l3PC, False)
+                            elif (vmm and l3VPC):
+                                entry = reMap(entry, vmmDom, False, False, l3Dom, False, False, l3VPC)
+                            elif (phys and port and l3If and l3PC and l3VPC):
+                                entry = reMap(entry, False, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
+                            elif (phys and l3If and l3PC):
+                                entry = reMap(entry, False, phyDom, port, l3Dom, l3If, l3PC, False)
+                            elif (phys and l3If and l3VPC):
+                                entry = reMap(entry, False, phyDom, port, l3Dom, l3If, False, l3VPC)
+                            elif (phys and l3If):
+                                entry = reMap(entry, False, phyDom, port, l3Dom, l3If, False, False)
+                            elif (phys and l3PC and l3VPC):
+                                entry = reMap(entry, False, phyDom, port, l3Dom, False, l3PC, l3VPC)
+                            elif (phys and l3PC):
+                                entry = reMap(entry, False, phyDom, port, l3Dom, False, l3PC, False)
+                            elif (phys and l3VPC):
+                                entry = reMap(entry, False, phyDom, port, l3Dom, False, False, l3VPC)
+                            elif (l3If and l3PC and l3VPC):
+                                entry = reMap(entry, False, False, False, l3Dom, l3If, l3PC, l3VPC)
+                            elif (l3If and l3PC):
+                                entry = reMap(entry, False, False, False, l3Dom, l3If, l3PC, False)
+                            elif (l3If and l3VPC):
+                                entry = reMap(entry, False, False, False, l3Dom, l3If, False, l3VPC)
+                            elif l3If:
+                                entry = reMap(entry, False, False, False, l3Dom, l3If, False, False)
+                            elif (l3PC and l3VPC):
+                                entry = reMap(entry, False, False, False, l3Dom, False, l3PC, l3VPC)
+                            elif l3PC:
+                                entry = reMap(entry, False, False, False, l3Dom, False, l3PC, False)
+                            elif l3VPC:
+                                entry = reMap(entry, False, False, False, l3Dom, False, False, l3VPC)
+                            elif (vmm and phys):
+                                entry = reMap(entry, vmmDom, phyDom, port, False, False, False, False)
+                            elif vmm:
+                                entry = reMap(entry, vmmDom, False, False, False, False, False, False)
+                            elif phys:
+                                entry = reMap(entry, False, phyDom, port, False, False, False, False)
+                r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
+                if r2 is not None:
+                    attributes = {}
+                    r3 = re.finditer("(?P<key>[^:, ]+):(?P<value>[^,]+)", entry["aaaModLR"]["attributes"]["changeSet"])
+                    for m in r3:
+                        attributes[m.group("key")] = m.group("value")
+                    #r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
+                    code = re.sub("^E","", entry["aaaModLR"]["attributes"]["code"])
+                    if code in codes:
+                        className = codes[code]
+                    else:
+                        print "Could not find Audit Code (%s) in Code List.  Are you running the same version as Audits?"%(
+                            code)
+                        sys.exit()
 
-                url = "/api/mo/" + r2.group("url") + ".json"
+                    url = "/api/mo/" + r2.group("url") + ".json"
 
-                if "deleted" in entry["aaaModLR"]["attributes"]["descr"]:
-                    data = {className:{"attributes":{"status":"deleted"}}}
-                elif "created" in entry["aaaModLR"]["attributes"]["descr"]:
+                    if "deleted" in entry["aaaModLR"]["attributes"]["descr"]:
+                        data = {className:{"attributes":{"status":"deleted"}}}
+                    elif "created" in entry["aaaModLR"]["attributes"]["descr"]:
+                        data = {className:{"attributes":attributes}}
+
+                    # Send POST to APIC with Audit Data
+                    POST = session.push_to_apic(url, data)
+                    if not POST.ok:
+                        print "POST was not Successful with:"
+                        print "%s to:" % data
+                        print "%s" % url
+                    else:
+                        print "Got 200 OK From POST with:"
+                        print "%s to:" % data
+                        print "%s" % url
+
+
+                    time.sleep(wait)
+
+                    # If Stepping is enabled, prompt for user input before
+                    # proceeding to the next entry
+                    # don't prompt on last entry
+                    if entry != audits[len(audits)-1]:
+                        if step != None:
+                            user_input = None
+                            while user_input == None:
+                                user_input = raw_input( "Press Enter to Continue        : ")
+                                if len(user_input) != 0:
+                                    print "Please press Enter to Continue"
+
+            elif entry["aaaModLR"]["attributes"]["ind"] == "modification":
+                r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
+                for object in range(0, len(reMapObjects)):
+                        if reMapObjects[object] in r2.group("url"):
+                            if (vmm and phys and l3If and l3PC and l3VPC):
+                                entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
+                            elif (vmm and phys and l3If and l3PC):
+                                entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, False)
+                            elif (vmm and phys and l3If and l3SVI):
+                                entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, False, l3VPC)
+                            elif (vmm and phys and l3If):
+                                entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, False, False)
+                            elif (vmm and phys and l3PC and l3VPC):
+                                entry = reMap(entry, vmmDom, phyDom, port, l3Dom, False, l3PC, l3VPC)
+                            elif (vmm and phys and l3PC):
+                                entry = reMap(entry, vmmDom, phyDom, port, l3Dom, False, l3PC, False)
+                            elif (vmm and phys and l3VPC):
+                                entry = reMap(entry, vmmDom, phyDom, port, l3Dom, False, False, l3VPC)
+                            elif (vmm and phys):
+                                entry = reMap(entry, vmmDom, phyDom, port, False, False, False, False)
+                            elif (vmm and l3If and l3PC and l3VPC):
+                                entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, l3PC, l3VPC)
+                            elif (vmm and l3If and l3PC):
+                                entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, l3PC, False)
+                            elif (vmm and l3If and l3VPC):
+                                entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, False, l3VPC)
+                            elif (vmm and l3If):
+                                entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, False, False)
+                            elif (vmm and l3PC and l3VPC):
+                                entry = reMap(entry, vmmDom, False, False, l3Dom, False, l3PC, l3VPC)
+                            elif (vmm and l3PC):
+                                entry = reMap(entry, vmmDom, False, False, l3Dom, False, l3PC, False)
+                            elif (vmm and l3VPC):
+                                entry = reMap(entry, vmmDom, False, False, l3Dom, False, False, l3VPC)
+                            elif (phys and port and l3If and l3PC and l3VPC):
+                                entry = reMap(entry, False, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
+                            elif (phys and l3If and l3PC):
+                                entry = reMap(entry, False, phyDom, port, l3Dom, l3If, l3PC, False)
+                            elif (phys and l3If and l3VPC):
+                                entry = reMap(entry, False, phyDom, port, l3Dom, l3If, False, l3VPC)
+                            elif (phys and l3If):
+                                entry = reMap(entry, False, phyDom, port, l3Dom, l3If, False, False)
+                            elif (phys and l3PC and l3VPC):
+                                entry = reMap(entry, False, phyDom, port, l3Dom, False, l3PC, l3VPC)
+                            elif (phys and l3PC):
+                                entry = reMap(entry, False, phyDom, port, l3Dom, False, l3PC, False)
+                            elif (phys and l3VPC):
+                                entry = reMap(entry, False, phyDom, port, l3Dom, False, False, l3VPC)
+                            elif (l3If and l3PC and l3VPC):
+                                entry = reMap(entry, False, False, False, l3Dom, l3If, l3PC, l3VPC)
+                            elif (l3If and l3PC):
+                                entry = reMap(entry, False, False, False, l3Dom, l3If, l3PC, False)
+                            elif (l3If and l3VPC):
+                                entry = reMap(entry, False, False, False, l3Dom, l3If, False, l3VPC)
+                            elif l3If:
+                                entry = reMap(entry, False, False, False, l3Dom, l3If, False, False)
+                            elif (l3PC and l3VPC):
+                                entry = reMap(entry, False, False, False, l3Dom, False, l3PC, l3VPC)
+                            elif l3PC:
+                                entry = reMap(entry, False, False, False, l3Dom, False, l3PC, False)
+                            elif l3VPC:
+                                entry = reMap(entry, False, False, False, l3Dom, False, False, l3VPC)
+                            elif (vmm and phys):
+                                entry = reMap(entry, vmmDom, phyDom, port, False, False, False, False)
+                            elif vmm:
+                                entry = reMap(entry, vmmDom, False, False, False, False, False, False)
+                            elif phys:
+                                entry = reMap(entry, False, phyDom, port, False, False, False, False)
+                r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
+                if r2 is not None:
+                    attributes = {}
+                    r3 = re.finditer("(?P<key>[a-zA-Z0-9]+) \(Old:[ ]*(?P<old>.+?) New:[ ]*(?P<new>[^)]*)\)", entry["aaaModLR"]["attributes"]["changeSet"])
+                    for m in r3:
+                        attributes[m.group("key").strip()] = m.group("new").strip()
+                    if entry["aaaModLR"]["attributes"]["code"] in codes:
+                        className = codes[entry["aaaModLR"]["attributes"]["code"]]
+                    else:
+                        print "Could not find Audit Code in Code List.  Are you running the same version as Audits?"
+                        sys.exit()
+                    #r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
+                    #if r4.group("class") in classes:
+                    #    className =  classes[r4.group("class")]
+                    url = "/api/mo/" + r2.group("url") + ".json"
                     data = {className:{"attributes":attributes}}
 
-                # Send POST to APIC with Audit Data
-                POST = session.push_to_apic(url, data)
-                if not POST.ok:
-                    print "POST was not Successful with:"
-                    print "%s to:" % data
-                    print "%s" % url
-                else:
-                    print "Got 200 OK From POST with:"
-                    print "%s to:" % data
-                    print "%s" % url
+                    POST = session.push_to_apic(url, data)
+                    if not POST.ok:
+                        badPost = []
+                        print "POST was not Successful with:"
+                        print "%s to:" % data
+                        print "%s" % url
+                        badPost.append(entry)
+                    else:
+                        goodPost = []
+                        print "Got 200 OK From POST with:"
+                        print "%s to:" % data
+                        print "%s" % url
+                        goodPost.append(entry)
+                    time.sleep(wait)
 
-
-                time.sleep(wait)
-
-                # If Stepping is enabled, prompt for user input before
-                # proceeding to the next entry
-                # don't prompt on last entry
-                if entry != audits[len(audits)-1]:
-                    if step != None:
-                        user_input = None
-                        while user_input == None:
-                            user_input = raw_input( "Press Enter to Continue        : ")
-                            if len(user_input) != 0:
-                                print "Please press Enter to Continue"
-
-        elif entry["aaaModLR"]["attributes"]["ind"] == "modification":
-            r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
-            for object in range(0, len(reMapObjects)):
-                    if reMapObjects[object] in r2.group("url"):
-                        if (vmm and phys and l3If and l3PC and l3VPC):
-                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
-                        elif (vmm and phys and l3If and l3PC):
-                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, False)
-                        elif (vmm and phys and l3If and l3SVI):
-                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, False, l3VPC)
-                        elif (vmm and phys and l3If):
-                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, False, False)
-                        elif (vmm and phys and l3PC and l3VPC):
-                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, False, l3PC, l3VPC)
-                        elif (vmm and phys and l3PC):
-                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, False, l3PC, False)
-                        elif (vmm and phys and l3VPC):
-                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, False, False, l3VPC)
-                        elif (vmm and phys):
-                            entry = reMap(entry, vmmDom, phyDom, port, False, False, False, False)
-                        elif (vmm and l3If and l3PC and l3VPC):
-                            entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, l3PC, l3VPC)
-                        elif (vmm and l3If and l3PC):
-                            entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, l3PC, False)
-                        elif (vmm and l3If and l3VPC):
-                            entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, False, l3VPC)
-                        elif (vmm and l3If):
-                            entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, False, False)
-                        elif (vmm and l3PC and l3VPC):
-                            entry = reMap(entry, vmmDom, False, False, l3Dom, False, l3PC, l3VPC)
-                        elif (vmm and l3PC):
-                            entry = reMap(entry, vmmDom, False, False, l3Dom, False, l3PC, False)
-                        elif (vmm and l3VPC):
-                            entry = reMap(entry, vmmDom, False, False, l3Dom, False, False, l3VPC)
-                        elif (phys and port and l3If and l3PC and l3VPC):
-                            entry = reMap(entry, False, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
-                        elif (phys and l3If and l3PC):
-                            entry = reMap(entry, False, phyDom, port, l3Dom, l3If, l3PC, False)
-                        elif (phys and l3If and l3VPC):
-                            entry = reMap(entry, False, phyDom, port, l3Dom, l3If, False, l3VPC)
-                        elif (phys and l3If):
-                            entry = reMap(entry, False, phyDom, port, l3Dom, l3If, False, False)
-                        elif (phys and l3PC and l3VPC):
-                            entry = reMap(entry, False, phyDom, port, l3Dom, False, l3PC, l3VPC)
-                        elif (phys and l3PC):
-                            entry = reMap(entry, False, phyDom, port, l3Dom, False, l3PC, False)
-                        elif (phys and l3VPC):
-                            entry = reMap(entry, False, phyDom, port, l3Dom, False, False, l3VPC)
-                        elif (l3If and l3PC and l3VPC):
-                            entry = reMap(entry, False, False, False, l3Dom, l3If, l3PC, l3VPC)
-                        elif (l3If and l3PC):
-                            entry = reMap(entry, False, False, False, l3Dom, l3If, l3PC, False)
-                        elif (l3If and l3VPC):
-                            entry = reMap(entry, False, False, False, l3Dom, l3If, False, l3VPC)
-                        elif l3If:
-                            entry = reMap(entry, False, False, False, l3Dom, l3If, False, False)
-                        elif (l3PC and l3VPC):
-                            entry = reMap(entry, False, False, False, l3Dom, False, l3PC, l3VPC)
-                        elif l3PC:
-                            entry = reMap(entry, False, False, False, l3Dom, False, l3PC, False)
-                        elif l3VPC:
-                            entry = reMap(entry, False, False, False, l3Dom, False, False, l3VPC)
-                        elif (vmm and phys):
-                            entry = reMap(entry, vmmDom, phyDom, port, False, False, False, False)
-                        elif vmm:
-                            entry = reMap(entry, vmmDom, False, False, False, False, False, False)
-                        elif phys:
-                            entry = reMap(entry, False, phyDom, port, False, False, False, False)
-            r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
-            if r2 is not None:
-                attributes = {}
-                r3 = re.finditer("(?P<key>[a-zA-Z0-9]+) \(Old:[ ]*(?P<old>.+?) New:[ ]*(?P<new>[^)]*)\)", entry["aaaModLR"]["attributes"]["changeSet"])
-                for m in r3:
-                    attributes[m.group("key").strip()] = m.group("new").strip()
-                if entry["aaaModLR"]["attributes"]["code"] in codes:
-                    className = codes[entry["aaaModLR"]["attributes"]["code"]]
-                else:
-                    print "Could not find Audit Code in Code List.  Are you running the same version as Audits?"
-                    sys.exit()
-                #r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
-                #if r4.group("class") in classes:
-                #    className =  classes[r4.group("class")]
-                url = "/api/mo/" + r2.group("url") + ".json"
-                data = {className:{"attributes":attributes}}
-
-                POST = session.push_to_apic(url, data)
-                if not POST.ok:
-                    badPost = []
-                    print "POST was not Successful with:"
-                    print "%s to:" % data
-                    print "%s" % url
-                    badPost.append(entry)
-                else:
-                    goodPost = []
-                    print "Got 200 OK From POST with:"
-                    print "%s to:" % data
-                    print "%s" % url
-                    goodPost.append(entry)
-                time.sleep(wait)
-
-                # If Stepping is enabled, prompt for user input before
-                # proceeding to the next entry
-                # don't prompt on last entry
-                if entry != audits[len(audits)-1]:
-                    if step != None:
-                        user_input = None
-                        while user_input == None:
-                            user_input = raw_input( "Press Enter to Continue        : ")
-                            if len(user_input) != 0:
-                                print "Please press Enter to Continue"
-
+                    # If Stepping is enabled, prompt for user input before
+                    # proceeding to the next entry
+                    # don't prompt on last entry
+                    if entry != audits[len(audits)-1]:
+                        if step != None:
+                            user_input = None
+                            while user_input == None:
+                                user_input = raw_input( "Press Enter to Continue        : ")
+                                if len(user_input) != 0:
+                                    print "Please press Enter to Continue"
+        except:
+            continue
 
 
 def main(file, ip, username, password, https, port, waitTime, step, xml, json, catalog, start_time, end_time):
