@@ -3,6 +3,9 @@ __author__ = 'josephristaino'
 import os, sys, logging, getpass, re, json, time, requests
 from acisession import Session
 from lxml import html
+import lxml.etree as etree
+import dateutil
+import dateutil.parser
 
 
 MINIMUM_POD  = 1
@@ -31,6 +34,10 @@ reMapObjects = [
         "rsnodeL3OutAtt"
     ]
 
+def parse_timestamp(ts_str):
+    """ return float unix timestamp for timestamp string """
+    dt = dateutil.parser.parse(ts_str, yearfirst=True, fuzzy=True)
+    return (time.mktime(dt.timetuple()) + dt.microsecond/1000000.0)
 
 def getVMMUserInfo(session):
 
@@ -420,7 +427,7 @@ def getL3PC(session):
         bundleChoice = raw_input("Which Path Would You Like to Use for L3 PC Replacement?                 :")
         try:
             bundleChoice = int(bundleChoice)
-            if bundleChoice < 1 or bundleChoice >len(bundleChoice): raise ValueError("")
+            if bundleChoice < 1 or bundleChoice >len(bundleDNList): raise ValueError("")
         except ValueError as e:
             print "Please select a value between 1 and %s" % len(bundleDNList)
             portChoice = None
@@ -578,12 +585,40 @@ def jsonParser(file):
     totalEntries = parsed['totalCount']
     print "The Total number of Changes:                        %s" % totalEntries
 
-    #Sort Audit Entries by Created Date/Time: Oldest --> Newest
-    dateSorted = []
-    for i in range(int(totalEntries)-1, -1, -1):
-        dateSorted.append(parsed["imdata"][i])
+    return sortAudits(parsed["imdata"])
 
-    return dateSorted
+
+def xmlParser(file):
+    audits = []
+    with open(file, "r") as f:
+        root = etree.parse(f)
+        for e in root.findall("./aaaModLR"):
+            audits.append({"aaaModLR": {"attributes":dict(e.attrib)}})
+
+    print "The Total number of Changes:                        %s" % len(audits)
+    return sortAudits(audits)
+
+def sortAudits(audits):
+    """
+    sort audits based on timestamp with oldest timestamp first.  For audits that have exact timestamp, the object with
+    shortest dn string is first.
+    """
+    buckets = {}    # dict of audits with same ts indexed by key
+    for a in audits:
+        ts = parse_timestamp(a["aaaModLR"]["attributes"]["created"])
+        a["aaaModLR"]["attributes"]["_ts"] = ts
+        if ts not in buckets: buckets[ts] = []
+        buckets[ts].append(a)
+
+    results = []
+    for ts in sorted(buckets):
+        b = buckets[ts]
+        for a in sorted(b, key=lambda b: len(b["aaaModLR"]["attributes"]["dn"])):
+            results.append(a)
+
+    return results
+
+
 
 def getTotals(dateSorted):
 
@@ -599,97 +634,148 @@ def getTotals(dateSorted):
     all = []
     for entry in dateSorted:
         r1 = re.search("uni\/(?P<gltn>tn-)", entry["aaaModLR"]["attributes"]["dn"])
-        if r1 is not None:
-            if r1.group("gltn") in entry["aaaModLR"]["attributes"]["dn"]:
-                all.append(entry)
+        r2 = re.search("tn-mgmt", entry["aaaModLR"]["attributes"]["dn"])
+        if r2 is None:
+            if r1 is not None:
+                if r1.group("gltn") in entry["aaaModLR"]["attributes"]["dn"]:
+                    entry["aaaModLR"]["attributes"]["_ts"] = parse_timestamp(entry["aaaModLR"]["attributes"]["created"])
+                    all.append(entry)
+        else:
+            mgmt = True
+            continue
 
 
     #Total Tenant Objects
     allTN = []
     for entry in dateSorted:
         r1 = re.search("uni\/tn-(?P<tn>[^\]\/]+)\]", entry["aaaModLR"]["attributes"]["dn"])
-        if r1 is not None:
-            if r1.group("tn") in entry["aaaModLR"]["attributes"]["dn"]:
-                allTN.append(entry)
+        r2 = re.search("tn-mgmt", entry["aaaModLR"]["attributes"]["dn"])
+        if r2 is None:
+            if r1 is not None:
+                if r1.group("tn") in entry["aaaModLR"]["attributes"]["dn"]:
+                    entry["aaaModLR"]["attributes"]["_ts"] = parse_timestamp(entry["aaaModLR"]["attributes"]["created"])
+                    allTN.append(entry)
 
+        else:
+            continue
 
     #Total VRF Objects
     allVrf = []
     for entry in dateSorted:
         r1 = re.search("uni\/tn-.*\/(?P<vrf>ctx-)", entry["aaaModLR"]["attributes"]["dn"])
-        if r1 is not None:
-            if r1.group("vrf") in entry["aaaModLR"]["attributes"]["dn"]:
-                allVrf.append(entry)
+        r2 = re.search("tn-mgmt", entry["aaaModLR"]["attributes"]["dn"])
+        if r2 is None:
+            if r1 is not None:
+                if r1.group("vrf") in entry["aaaModLR"]["attributes"]["dn"]:
+                    entry["aaaModLR"]["attributes"]["_ts"] = parse_timestamp(entry["aaaModLR"]["attributes"]["created"])
+                    allVrf.append(entry)
+
+        else:
+            continue
 
     #Total L3Out Objects
     allL3Out = []
     for entry in dateSorted:
         r1 = re.search("uni\/tn-.*\/(?P<l3>out-)", entry["aaaModLR"]["attributes"]["dn"])
-        if r1 is not None:
-            if r1.group("l3") in entry["aaaModLR"]["attributes"]["dn"]:
-                allL3Out.append(entry)
-                r2 = re.search("(?P<l3if>rspathL3OutAtt-.*(?=pathep)pathep-\[eth1\/)", entry["aaaModLR"]["attributes"]["dn"])
-                if r2 is not None:
-                    if r2.group("l3if") in entry ["aaaModLR"]["attributes"]["dn"]:
-                        l3If = True
-                r3 = re.search("(?P<l3PC>rspathL3OutAtt-\[topology\/pod-[0-9]+\/paths-(?P<node>[0-9]+)\/pathep-\[[^eth1\/]+)",
-                               entry["aaaModLR"]["attributes"]["dn"])
-                if r3 is not None:
-                    if r3.group("l3PC") in entry ["aaaModLR"]["attributes"]["dn"]:
-                        l3PC = True
-                r4 = re.search("(?P<l3VPC>rspathL3OutAtt-.*(?=protpaths)protpaths-(?P<node1>[0-9]+))\-(?P<node2>[0-9]+)",
-                               entry["aaaModLR"]["attributes"]["dn"])
-                if r4 is not None:
-                    if r4.group("l3VPC") in entry ["aaaModLR"]["attributes"]["dn"]:
-                        l3VPC = True
+        r2 = re.search("tn-mgmt", entry["aaaModLR"]["attributes"]["dn"])
+        if r2 is None:
+            if r1 is not None:
+                if r1.group("l3") in entry["aaaModLR"]["attributes"]["dn"]:
+                    entry["aaaModLR"]["attributes"]["_ts"] = parse_timestamp(entry["aaaModLR"]["attributes"]["created"])
+                    allL3Out.append(entry)
+                    r2 = re.search("(?P<l3if>rspathL3OutAtt-.*(?=pathep)pathep-\[eth1\/)", entry["aaaModLR"]["attributes"]["dn"])
+                    if r2 is not None:
+                        if r2.group("l3if") in entry ["aaaModLR"]["attributes"]["dn"]:
+                            l3If = True
+                    r3 = re.search("(?P<l3PC>rspathL3OutAtt-\[topology\/pod-[0-9]+\/paths-(?P<node>[0-9]+)\/pathep-\[[^eth1\/]+)",
+                                   entry["aaaModLR"]["attributes"]["dn"])
+                    if r3 is not None:
+                        if r3.group("l3PC") in entry ["aaaModLR"]["attributes"]["dn"]:
+                            l3PC = True
+                    r4 = re.search("(?P<l3VPC>rspathL3OutAtt-.*(?=protpaths)protpaths-(?P<node1>[0-9]+))\-(?P<node2>[0-9]+)",
+                                   entry["aaaModLR"]["attributes"]["dn"])
+                    if r4 is not None:
+                        if r4.group("l3VPC") in entry ["aaaModLR"]["attributes"]["dn"]:
+                            l3VPC = True
+
+        else:
+            continue
 
     #Total App Profile Objects
     allApp = []
     for entry in dateSorted:
         r1 = re.search("uni\/tn-.*\/ap-(?P<app>[^\]/]+)\]", entry["aaaModLR"]["attributes"]["dn"])
-        if r1 is not None:
-            if r1.group("app") in entry["aaaModLR"]["attributes"]["dn"]:
-                allApp.append(entry)
+        r2 = re.search("tn-mgmt", entry["aaaModLR"]["attributes"]["dn"])
+        if r2 is None:
+            if r1 is not None:
+                if r1.group("app") in entry["aaaModLR"]["attributes"]["dn"]:
+                    entry["aaaModLR"]["attributes"]["_ts"] = parse_timestamp(entry["aaaModLR"]["attributes"]["created"])
+                    allApp.append(entry)
+
+        else:
+            continue
 
     #Total EPG Objects
     allEPG = []
     for entry in dateSorted:
         r1 = re.search("uni\/tn-.*\/(?P<epg>epg-)", entry["aaaModLR"]["attributes"]["dn"])
-        if r1 is not None:
-            if r1.group("epg") in entry["aaaModLR"]["attributes"]["dn"]:
-                allEPG.append(entry)
-                r2 = re.search("(?P<vmm>rsdomAtt-\[uni\/vmmp-VMware)", entry["aaaModLR"]["attributes"]["dn"])
-                if r2 is not None:
-                    if r2.group("vmm") in entry ["aaaModLR"]["attributes"]["dn"]:
-                        vmm = True
-                r3 = re.search("(?P<phys>rsdomAtt-\[uni\/phys-)", entry["aaaModLR"]["attributes"]["dn"])
-                if r3 is not None:
-                    if r3.group("phys") in entry["aaaModLR"]["attributes"]["dn"]:
-                        phys = True
+        r2 = re.search("tn-mgmt", entry["aaaModLR"]["attributes"]["dn"])
+        if r2 is None:
+            if r1 is not None:
+                if r1.group("epg") in entry["aaaModLR"]["attributes"]["dn"]:
+                    entry["aaaModLR"]["attributes"]["_ts"] = parse_timestamp(entry["aaaModLR"]["attributes"]["created"])
+                    allEPG.append(entry)
+                    r2 = re.search("(?P<vmm>rsdomAtt-\[uni\/vmmp-VMware)", entry["aaaModLR"]["attributes"]["dn"])
+                    if r2 is not None:
+                        if r2.group("vmm") in entry ["aaaModLR"]["attributes"]["dn"]:
+                            vmm = True
+                    r3 = re.search("(?P<phys>rsdomAtt-\[uni\/phys-)", entry["aaaModLR"]["attributes"]["dn"])
+                    if r3 is not None:
+                        if r3.group("phys") in entry["aaaModLR"]["attributes"]["dn"]:
+                            phys = True
+        else:
+            continue
 
     #Total BD Objects
     allBD = []
     for entry in dateSorted:
         r1 = re.search("uni\/tn-.*\/(?P<bd>BD-)", entry["aaaModLR"]["attributes"]["dn"])
-        if r1 is not None:
-            if r1.group("bd") in entry["aaaModLR"]["attributes"]["dn"]:
-                allBD.append(entry)
+        r2 = re.search("tn-mgmt", entry["aaaModLR"]["attributes"]["dn"])
+        if r2 is None:
+            if r1 is not None:
+                if r1.group("bd") in entry["aaaModLR"]["attributes"]["dn"]:
+                    entry["aaaModLR"]["attributes"]["_ts"] = parse_timestamp(entry["aaaModLR"]["attributes"]["created"])
+                    allBD.append(entry)
+
+        else:
+            continue
 
     #Total Contract Objects
     allCon = []
     for entry in dateSorted:
         r1 = re.search("uni\/tn-.*\/(?P<con>brc-)", entry["aaaModLR"]["attributes"]["dn"])
-        if r1 is not None:
-            if r1.group("con") in entry["aaaModLR"]["attributes"]["dn"]:
-                allCon.append(entry)
+        r2 = re.search("tn-mgmt", entry["aaaModLR"]["attributes"]["dn"])
+        if r2 is None:
+            if r1 is not None:
+                if r1.group("con") in entry["aaaModLR"]["attributes"]["dn"]:
+                    entry["aaaModLR"]["attributes"]["_ts"] = parse_timestamp(entry["aaaModLR"]["attributes"]["created"])
+                    allCon.append(entry)
+
+        else:
+            continue
 
     #Total Filter Objects
     allFlt = []
     for entry in dateSorted:
         r1 = re.search("uni\/tn-.*\/(?P<flt>flt-)", entry["aaaModLR"]["attributes"]["dn"])
-        if r1 is not None:
-            if r1.group("flt") in entry["aaaModLR"]["attributes"]["dn"]:
-                allFlt.append(entry)
+        r2 = re.search("tn-mgmt", entry["aaaModLR"]["attributes"]["dn"])
+        if r2 is None:
+            if r1 is not None:
+                if r1.group("flt") in entry["aaaModLR"]["attributes"]["dn"]:
+                    entry["aaaModLR"]["attributes"]["_ts"] = parse_timestamp(entry["aaaModLR"]["attributes"]["created"])
+                    allFlt.append(entry)
+        else:
+            continue
 
     print "The Total number of Global Tenant Config Changes:   %s" % len(all)
     print "The Total number of Tenant Config Changes:          %s" % len(allTN)
@@ -701,7 +787,7 @@ def getTotals(dateSorted):
     print "The Total number of Contract Config Changes:        %s" % len(allCon)
     print "The Total number of Filter Config Changes:          %s\n" % len(allFlt)
 
-    return all, allTN, allVrf, allL3Out, allApp, allEPG, allBD, allCon, allFlt, l3If, l3PC, l3VPC, vmm, phys
+    return all, allTN, allVrf, allL3Out, allApp, allEPG, allBD, allCon, allFlt, l3If, l3PC, l3VPC, vmm, phys, mgmt
 
 def env_setup(ip, usr, pwd, https, port):
 
@@ -843,20 +929,42 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3
     else:
         wait = 3
 
+    page = session.get("/doc/model/MESSAGE-CATALOG.txt")
+    codes = {}
+    current_code = None
+    event_code_regex = re.compile("\[EVENT CODE\]:[ \t]*(?P<event_code>E[0-9]+)")
+    class_code_regex = re.compile("(?i)\[MO CLASS\]:[ \t]*(?P<namespace>[a-z0-9+]+):(?P<class>[a-z0-9]+)")
+    for l in page.content.split("\n"):
+        if current_code is not None:
+            r = class_code_regex.search(l)
+            if r is not None:
+                codes[current_code] = r.group("namespace") + r.group("class")
+                current_code = None
+        else:
+            r = event_code_regex.search(l)
+            if r is not None:
+                current_code = r.group("event_code")
+
+    """
     # Need to build a dictionary of all Classes to use for each POST
     # Will do this by querying the API Docs and Regexing Classes
     page = session.get('/doc/html/LeftSummary.html')
     tree = html.fromstring(page.content)
 
+
     # Get List of All Classes from the Documentation
     classEntries = tree.xpath('//a[starts-with(@href, "MO")]/text()')
-
-    # Append Namespace to Class Name and Dictionary Them
-    classes = {}
+    namespaces = ["fv","vz","vmm","l3ext","l2ext","igmp","opsf","pim","eigrp","bgp","bfd"]
+    all = {}
     for entry in classEntries:
-        namespace = re.search("(?P<key>vz|fv|vmm|l3ext|l2ext):(?P<value>\w+)", entry)
-        if namespace is not None:
-            classes[namespace.group("value")] = namespace.group("key") + namespace.group("value")
+        c = entry.split(":")
+        if len(c)!=2: sys.exit("this one is werid: %s" % entry)
+        if c[0] not in namespaces: continue
+        #if c[1] in all:
+            #print "duplicate %s %s:%s" % (all[c[1]], c[0], c[1])
+        else: all[c[1]] = "%s:%s" % (c[0],c[1])
+    sys.exit("stop")
+    """
 
 
     if "1" in selection or "6" in selection:
@@ -894,6 +1002,20 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3
                     if reMapObjects[object] in r2.group("url"):
                         if (vmm and phys and l3If and l3PC and l3VPC):
                             entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
+                        elif (vmm and phys and l3If and l3PC):
+                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, False)
+                        elif (vmm and phys and l3If and VPC):
+                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, False, l3VPC)
+                        elif (vmm and phys and l3If):
+                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, False, False)
+                        elif (vmm and phys and l3PC and l3VPC):
+                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, False, l3PC, l3VPC)
+                        elif (vmm and phys and l3PC):
+                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, False, l3PC, False)
+                        elif (vmm and phys and l3VPC):
+                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, False, False, l3VPC)
+                        elif (vmm and phys):
+                            entry = reMap(entry, vmmDom, phyDom, port, False, False, False, False)
                         elif (vmm and l3If and l3PC and l3VPC):
                             entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, l3PC, l3VPC)
                         elif (vmm and l3If and l3PC):
@@ -948,17 +1070,44 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3
                 r3 = re.finditer("(?P<key>[^:, ]+):(?P<value>[^,]+)", entry["aaaModLR"]["attributes"]["changeSet"])
                 for m in r3:
                     attributes[m.group("key")] = m.group("value")
-                r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
-                if r4.group("class") in classes:
-                    className =  classes[r4.group("class")]
+                #r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
+                if entry["aaaModLR"]["attributes"]["code"] in codes:
+                    className = codes[entry["aaaModLR"]["attributes"]["code"]]
+                else:
+                    print "Could not find Audit Code in Code List.  Are you running the same version as Audits?"
+                    sys.exit()
 
-                # Since we are checking the "desc" for object name, "Subnet"
-                # could be fvSubnet or l3extSubnet.  Need to be specific.
+                """
                 if "BD" in entry["aaaModLR"]["attributes"]["dn"] and "subnet" in entry["aaaModLR"]["attributes"]["dn"]:
                     className = "fvSubnet"
                 elif "instP" in entry["aaaModLR"]["attributes"]["dn"] and "extsubnet" in entry["aaaModLR"]["attributes"]["dn"]:
                     className = "l3extSubnet"
 
+                if ("igmpIfP" and "rsIfPol") in entry["aaaModLR"]["attributes"]["dn"]:
+                    className = "igmpRsIfPol"
+                elif "igmpIfP" in entry["aaaModLR"]["attributes"]["dn"]:
+                    className = "igmpIfP"
+
+                if ("pimIfP" and "rsIfPol") in entry["aaaModLR"]["attributes"]["dn"]:
+                    className = "pimRsIfPol"
+                elif "pimIfP" in entry["aaaModLR"]["attributes"]["dn"]:
+                    className = "pimIfP"
+
+                if ("ospfIfP" and "rsIfPol") in entry["aaaModLR"]["attributes"]["dn"]:
+                    className = "ospfRsIfPol"
+                elif "ospfIfP" in entry["aaaModLR"]["attributes"]["dn"]:
+                    className = "ospfIfP"
+
+                if ("eigrpIfP" and "rsIfPol") in entry["aaaModLR"]["attributes"]["dn"]:
+                    className = "eigrpRsIfPol"
+                elif "eigrpIfP" in entry["aaaModLR"]["attributes"]["dn"]:
+                    className = "eigrpIfP"
+
+                if ("bfdIfP" and "rsIfPol") in entry["aaaModLR"]["attributes"]["dn"]:
+                    className = "bfdRsIfPol"
+                elif "bfdIfP" in entry["aaaModLR"]["attributes"]["dn"]:
+                    className = "bfdIfP"
+                """
                 url = "/api/mo/" + r2.group("url") + ".json"
 
                 if "deleted" in entry["aaaModLR"]["attributes"]["descr"]:
@@ -997,6 +1146,20 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3
                     if reMapObjects[object] in r2.group("url"):
                         if (vmm and phys and l3If and l3PC and l3VPC):
                             entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
+                        elif (vmm and phys and l3If and l3PC):
+                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, False)
+                        elif (vmm and phys and l3If and VPC):
+                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, False, l3VPC)
+                        elif (vmm and phys and l3If):
+                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, False, False)
+                        elif (vmm and phys and l3PC and l3VPC):
+                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, False, l3PC, l3VPC)
+                        elif (vmm and phys and l3PC):
+                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, False, l3PC, False)
+                        elif (vmm and phys and l3VPC):
+                            entry = reMap(entry, vmmDom, phyDom, port, l3Dom, False, False, l3VPC)
+                        elif (vmm and phys):
+                            entry = reMap(entry, vmmDom, phyDom, port, False, False, False, False)
                         elif (vmm and l3If and l3PC and l3VPC):
                             entry = reMap(entry, vmmDom, False, False, l3Dom, l3If, l3PC, l3VPC)
                         elif (vmm and l3If and l3PC):
@@ -1051,21 +1214,30 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3
                 r3 = re.finditer("(?P<key>[a-zA-Z0-9]+) \(Old:[ ]*(?P<old>.+?) New:[ ]*(?P<new>[^)]*)\)", entry["aaaModLR"]["attributes"]["changeSet"])
                 for m in r3:
                     attributes[m.group("key").strip()] = m.group("new").strip()
-                r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
-                if r4.group("class") in classes:
-                    className =  classes[r4.group("class")]
+                if entry["aaaModLR"]["attributes"]["code"] in codes:
+                    className = codes[entry["aaaModLR"]["attributes"]["code"]]
+                else:
+                    print "Could not find Audit Code in Code List.  Are you running the same version as Audits?"
+                    sys.exit()
+                #r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
+                #if r4.group("class") in classes:
+                #    className =  classes[r4.group("class")]
                 url = "/api/mo/" + r2.group("url") + ".json"
                 data = {className:{"attributes":attributes}}
 
                 POST = session.push_to_apic(url, data)
                 if not POST.ok:
+                    badPost = []
                     print "POST was not Successful with:"
                     print "%s to:" % data
                     print "%s" % url
+                    badPost.append(entry)
                 else:
+                    goodPost = []
                     print "Got 200 OK From POST with:"
                     print "%s to:" % data
                     print "%s" % url
+                    goodPost.append(entry)
                 time.sleep(wait)
 
                 # If Stepping is enabled, prompt for user input before
@@ -1080,19 +1252,26 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3
                                 print "Please press Enter to Continue"
 
 
-def main(file, ip, username, password, https, port, waitTime, step):
+
+def main(file, ip, username, password, https, port, waitTime, step, xml, json):
 
     # Get Connection Info From User and Build a Session Object to APIC
     session = env_setup(ip, username, password, https, port)
 
-    # Sort the JSON
-    dateSorted = jsonParser(file)
+    if xml:
+        dateSorted = xmlParser(file)
+    elif json:
+        # Sort the JSON
+        dateSorted = jsonParser(file)
+
     #prettyPrint =  json.dumps(dateSorted, indent=2)
     #print prettyPrint
 
-    # Get Totals and Determine if VMM/Phys Domains are in use.  Alse determine what interfaces are used for L3 Out
-    all, allTN, allVrf, allL3Out, allApp, allEPG, allBD, allCon, allFlt, l3If, l3PC, l3VPC, vmm, phys = getTotals(dateSorted)
+    # Get Totals and Determine if VMM/Phys Domains are in use.  Also determine what interfaces are used for L3 Out
+    all, allTN, allVrf, allL3Out, allApp, allEPG, allBD, allCon, allFlt, l3If, l3PC, l3VPC, vmm, phys, mgmt = getTotals(dateSorted)
 
+    if mgmt == True:
+        print "Found Changes to MGMT Tenant. Skipping...!"
     if vmm == True:
         print "Found VMM Domains in EPG Audits!"
     if phys == True:
@@ -1102,7 +1281,9 @@ def main(file, ip, username, password, https, port, waitTime, step):
     if l3PC == True:
         print "Found PC Interfaces in L3 Out Audits!"
     if l3VPC == True:
-        print "Found VPC Interfaces in L3 Out Audits!\n"
+        print "Found VPC Interfaces in L3 Out Audits!"
+
+    print "\n"
 
     selections = {
         "1": all,
@@ -1144,8 +1325,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--file", action="store", help="filename", dest="file")
-    #parser.add_argument("--xml", action="store_true", help="input in xml format", dest="xml")
-    #parser.add_argument("--json", action="store_true", help="input in json format", dest="json")
+    parser.add_argument("--xml", action="store_true", help="input in xml format", dest="xml")
+    parser.add_argument("--json", action="store_true", help="input in json format", dest="json")
     parser.add_argument("--ip", action="store", dest="ip",help="APIC URL", default=None)
     parser.add_argument("--username", action="store", dest="username",help="admin username", default="admin")
     parser.add_argument("--password", action="store", dest="password",help="admin password", default=None)
@@ -1174,5 +1355,5 @@ if __name__ == "__main__":
     if args.debug == "WARN": logger.setLevel(logging.WARN)
     if args.debug == "ERROR": logger.setLevel(logging.ERROR)
 
-    main(args.file, args.ip, args.username, args.password, args.https, args.port, args.time, args.step)
+    main(args.file, args.ip, args.username, args.password, args.https, args.port, args.time, args.step, args.xml, args.json)
 
