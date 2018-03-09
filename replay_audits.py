@@ -637,6 +637,7 @@ def getTotals(dateSorted):
     l3VPC = False
     vmm   = False
     phys  = False
+    port = False
     mgmt  = False
 
     #Get Total Number of Config Changes Per Tenant Object
@@ -738,6 +739,10 @@ def getTotals(dateSorted):
                     if r3 is not None:
                         if r3.group("phys") in entry["aaaModLR"]["attributes"]["dn"]:
                             phys = True
+                    r4 = re.search("(?P<port>rspathAtt-\[topology)", entry["aaaModLR"]["attributes"]["dn"])
+                    if r4 is not None:
+                        if r4.group("port") in entry["aaaModLR"]["attributes"]["dn"]:
+                            port = True
         else:
             continue
 
@@ -789,7 +794,7 @@ def getTotals(dateSorted):
     print "The Total number of Contract Config Changes:        %s" % len(allCon)
     print "The Total number of Filter Config Changes:          %s\n" % len(allFlt)
 
-    return all, allTN, allVrf, allL3Out, allApp, allEPG, allBD, allCon, allFlt, l3If, l3PC, l3VPC, vmm, phys, mgmt
+    return all, allTN, allVrf, allL3Out, allApp, allEPG, allBD, allCon, allFlt, l3If, l3PC, l3VPC, vmm, phys, port, mgmt
 
 def env_setup(ip, usr, pwd, https, port):
 
@@ -925,7 +930,7 @@ def reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC):
 
     return entry
 
-def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3PC, l3VPC, catalog):
+def replayAudits(session, selection, audits, waitTime, step, vmm, phys, port, l3If, l3PC, l3VPC, catalog):
     if waitTime is not None:
         wait = int(waitTime)
     else:
@@ -964,36 +969,16 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3
         print "unable to find event codes in catalog %s" % from_apic
         sys.exit(1)
 
-    """
-    # Need to build a dictionary of all Classes to use for each POST
-    # Will do this by querying the API Docs and Regexing Classes
-    page = session.get('/doc/html/LeftSummary.html')
-    tree = html.fromstring(page.content)
-
-
-    # Get List of All Classes from the Documentation
-    classEntries = tree.xpath('//a[starts-with(@href, "MO")]/text()')
-    namespaces = ["fv","vz","vmm","l3ext","l2ext","igmp","opsf","pim","eigrp","bgp","bfd"]
-    all = {}
-    for entry in classEntries:
-        c = entry.split(":")
-        if len(c)!=2: sys.exit("this one is werid: %s" % entry)
-        if c[0] not in namespaces: continue
-        #if c[1] in all:
-            #print "duplicate %s %s:%s" % (all[c[1]], c[0], c[1])
-        else: all[c[1]] = "%s:%s" % (c[0],c[1])
-    sys.exit("stop")
-    """
-
 
     if "1" in selection or "6" in selection:
         if vmm == True:
             vmmDom = getVMMUserInfo(session)
-        if phys == True:
+        if phys == True or port == True:
             phyDom, port = getPhyUserInfo(session)
     else:
         vmm = False
         phys = False
+        port = False
 
     if "1" in selection or "4" in selection:
         l3Dom, l3If, l3PC, l3VPC = getL3UserInfo(session, l3If, l3PC, l3VPC)
@@ -1006,6 +991,7 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3
     if "2" in selection or "3" in selection or "5" in selection or "7" in selection or "8" in selection or "9" in selection:
         vmm = False
         phys = False
+        port = False
         l3Dom = False
         l3If = False
         l3PC = False
@@ -1023,7 +1009,7 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3
                             entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
                         elif (vmm and phys and l3If and l3PC):
                             entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, False)
-                        elif (vmm and phys and l3If and VPC):
+                        elif (vmm and phys and l3If and l3VPC):
                             entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, False, l3VPC)
                         elif (vmm and phys and l3If):
                             entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, False, False)
@@ -1098,37 +1084,6 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3
                         code)
                     sys.exit()
 
-                """
-                if "BD" in entry["aaaModLR"]["attributes"]["dn"] and "subnet" in entry["aaaModLR"]["attributes"]["dn"]:
-                    className = "fvSubnet"
-                elif "instP" in entry["aaaModLR"]["attributes"]["dn"] and "extsubnet" in entry["aaaModLR"]["attributes"]["dn"]:
-                    className = "l3extSubnet"
-
-                if ("igmpIfP" and "rsIfPol") in entry["aaaModLR"]["attributes"]["dn"]:
-                    className = "igmpRsIfPol"
-                elif "igmpIfP" in entry["aaaModLR"]["attributes"]["dn"]:
-                    className = "igmpIfP"
-
-                if ("pimIfP" and "rsIfPol") in entry["aaaModLR"]["attributes"]["dn"]:
-                    className = "pimRsIfPol"
-                elif "pimIfP" in entry["aaaModLR"]["attributes"]["dn"]:
-                    className = "pimIfP"
-
-                if ("ospfIfP" and "rsIfPol") in entry["aaaModLR"]["attributes"]["dn"]:
-                    className = "ospfRsIfPol"
-                elif "ospfIfP" in entry["aaaModLR"]["attributes"]["dn"]:
-                    className = "ospfIfP"
-
-                if ("eigrpIfP" and "rsIfPol") in entry["aaaModLR"]["attributes"]["dn"]:
-                    className = "eigrpRsIfPol"
-                elif "eigrpIfP" in entry["aaaModLR"]["attributes"]["dn"]:
-                    className = "eigrpIfP"
-
-                if ("bfdIfP" and "rsIfPol") in entry["aaaModLR"]["attributes"]["dn"]:
-                    className = "bfdRsIfPol"
-                elif "bfdIfP" in entry["aaaModLR"]["attributes"]["dn"]:
-                    className = "bfdIfP"
-                """
                 url = "/api/mo/" + r2.group("url") + ".json"
 
                 if "deleted" in entry["aaaModLR"]["attributes"]["descr"]:
@@ -1169,7 +1124,7 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3
                             entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
                         elif (vmm and phys and l3If and l3PC):
                             entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, False)
-                        elif (vmm and phys and l3If and VPC):
+                        elif (vmm and phys and l3If and l3SVI):
                             entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, False, l3VPC)
                         elif (vmm and phys and l3If):
                             entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, False, False)
@@ -1303,7 +1258,7 @@ def main(file, ip, username, password, https, port, waitTime, step, xml, json, c
     #print prettyPrint
 
     # Get Totals and Determine if VMM/Phys Domains are in use.  Also determine what interfaces are used for L3 Out
-    all, allTN, allVrf, allL3Out, allApp, allEPG, allBD, allCon, allFlt, l3If, l3PC, l3VPC, vmm, phys, mgmt = getTotals(dateSorted)
+    all, allTN, allVrf, allL3Out, allApp, allEPG, allBD, allCon, allFlt, l3If, l3PC, l3VPC, vmm, phys, port, mgmt = getTotals(dateSorted)
 
     if mgmt is True:
         print "Found Changes to MGMT Tenant. Skipping...!"
@@ -1311,6 +1266,8 @@ def main(file, ip, username, password, https, port, waitTime, step, xml, json, c
         print "Found VMM Domains in EPG Audits!"
     if phys is True:
         print "Found Physical Domains in EPG Audits!"
+    if port is True:
+        print "Found EPG Static Paths in EPG Audits!"
     if l3If is True:
         print "Found Routed Interfaces / Sub-Interfaces in L3 Out Audits!"
     if l3PC is True:
@@ -1351,7 +1308,7 @@ def main(file, ip, username, password, https, port, waitTime, step, xml, json, c
     print "\n"
 
 
-    replayAudits(session, selection, selections[selection], waitTime, step, vmm, phys, l3If, l3PC, l3VPC, catalog)
+    replayAudits(session, selection, selections[selection], waitTime, step, vmm, phys, port, l3If, l3PC, l3VPC, catalog)
 
 
 if __name__ == "__main__":
