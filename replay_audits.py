@@ -1191,10 +1191,12 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, port, l3
                     r3 = re.finditer("(?P<key>[a-zA-Z0-9]+) \(Old:[ ]*(?P<old>.+?) New:[ ]*(?P<new>[^)]*)\)", entry["aaaModLR"]["attributes"]["changeSet"])
                     for m in r3:
                         attributes[m.group("key").strip()] = m.group("new").strip()
-                    if entry["aaaModLR"]["attributes"]["code"] in codes:
-                        className = codes[entry["aaaModLR"]["attributes"]["code"]]
+                    code = re.sub("^E","", entry["aaaModLR"]["attributes"]["code"])
+                    if code in codes:
+                        className = codes[code]
                     else:
-                        print "Could not find Audit Code in Code List.  Are you running the same version as Audits?"
+                        print "Could not find Audit Code (%s) in Code List.  Are you running the same version as Audits?"%(
+                            code)
                         sys.exit()
                     #r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
                     #if r4.group("class") in classes:
