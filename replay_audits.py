@@ -35,9 +35,14 @@ reMapObjects = [
     ]
 
 def parse_timestamp(ts_str):
-    """ return float unix timestamp for timestamp string """
-    dt = dateutil.parser.parse(ts_str, yearfirst=True, fuzzy=True)
-    return (time.mktime(dt.timetuple()) + dt.microsecond/1000000.0)
+    """ return float unix timestamp for timestamp string 
+        return None on error
+    """
+    try:
+        dt = dateutil.parser.parse(ts_str, yearfirst=True, fuzzy=True)
+        return (time.mktime(dt.timetuple()) + dt.microsecond/1000000.0)
+    except ValueError as e: 
+        return None
 
 def getVMMUserInfo(session):
 
@@ -315,6 +320,8 @@ def getL3UserInfo(session, l3If=False, l3PC=False, l3VPC=False):
         type = "PC"
     elif l3VPC:
         type = "VPC"
+    else:
+        type = None
 
     print "\n"
 
@@ -583,7 +590,7 @@ def jsonParser(file):
         parsed = json.load(js)
 
     totalEntries = parsed['totalCount']
-    print "The Total number of Changes:                        %s" % totalEntries
+    print "The Total number of Changes:                        %s" % len(parsed["imdata"])
 
     return sortAudits(parsed["imdata"])
 
@@ -606,6 +613,9 @@ def sortAudits(audits):
     buckets = {}    # dict of audits with same ts indexed by key
     for a in audits:
         ts = parse_timestamp(a["aaaModLR"]["attributes"]["created"])
+        if ts is None:
+            print "failed to parse timestamp for audit(%s): %s" % (a["aaaModLR"]["attributes"]["created"], a)
+            sys.exit(1)
         a["aaaModLR"]["attributes"]["_ts"] = ts
         if ts not in buckets: buckets[ts] = []
         buckets[ts].append(a)
@@ -627,6 +637,7 @@ def getTotals(dateSorted):
     l3VPC = False
     vmm   = False
     phys  = False
+    mgmt  = False
 
     #Get Total Number of Config Changes Per Tenant Object
 
@@ -638,7 +649,6 @@ def getTotals(dateSorted):
         if r2 is None:
             if r1 is not None:
                 if r1.group("gltn") in entry["aaaModLR"]["attributes"]["dn"]:
-                    entry["aaaModLR"]["attributes"]["_ts"] = parse_timestamp(entry["aaaModLR"]["attributes"]["created"])
                     all.append(entry)
         else:
             mgmt = True
@@ -653,7 +663,6 @@ def getTotals(dateSorted):
         if r2 is None:
             if r1 is not None:
                 if r1.group("tn") in entry["aaaModLR"]["attributes"]["dn"]:
-                    entry["aaaModLR"]["attributes"]["_ts"] = parse_timestamp(entry["aaaModLR"]["attributes"]["created"])
                     allTN.append(entry)
 
         else:
@@ -667,7 +676,6 @@ def getTotals(dateSorted):
         if r2 is None:
             if r1 is not None:
                 if r1.group("vrf") in entry["aaaModLR"]["attributes"]["dn"]:
-                    entry["aaaModLR"]["attributes"]["_ts"] = parse_timestamp(entry["aaaModLR"]["attributes"]["created"])
                     allVrf.append(entry)
 
         else:
@@ -681,7 +689,6 @@ def getTotals(dateSorted):
         if r2 is None:
             if r1 is not None:
                 if r1.group("l3") in entry["aaaModLR"]["attributes"]["dn"]:
-                    entry["aaaModLR"]["attributes"]["_ts"] = parse_timestamp(entry["aaaModLR"]["attributes"]["created"])
                     allL3Out.append(entry)
                     r2 = re.search("(?P<l3if>rspathL3OutAtt-.*(?=pathep)pathep-\[eth1\/)", entry["aaaModLR"]["attributes"]["dn"])
                     if r2 is not None:
@@ -709,7 +716,6 @@ def getTotals(dateSorted):
         if r2 is None:
             if r1 is not None:
                 if r1.group("app") in entry["aaaModLR"]["attributes"]["dn"]:
-                    entry["aaaModLR"]["attributes"]["_ts"] = parse_timestamp(entry["aaaModLR"]["attributes"]["created"])
                     allApp.append(entry)
 
         else:
@@ -723,7 +729,6 @@ def getTotals(dateSorted):
         if r2 is None:
             if r1 is not None:
                 if r1.group("epg") in entry["aaaModLR"]["attributes"]["dn"]:
-                    entry["aaaModLR"]["attributes"]["_ts"] = parse_timestamp(entry["aaaModLR"]["attributes"]["created"])
                     allEPG.append(entry)
                     r2 = re.search("(?P<vmm>rsdomAtt-\[uni\/vmmp-VMware)", entry["aaaModLR"]["attributes"]["dn"])
                     if r2 is not None:
@@ -744,7 +749,6 @@ def getTotals(dateSorted):
         if r2 is None:
             if r1 is not None:
                 if r1.group("bd") in entry["aaaModLR"]["attributes"]["dn"]:
-                    entry["aaaModLR"]["attributes"]["_ts"] = parse_timestamp(entry["aaaModLR"]["attributes"]["created"])
                     allBD.append(entry)
 
         else:
@@ -758,7 +762,6 @@ def getTotals(dateSorted):
         if r2 is None:
             if r1 is not None:
                 if r1.group("con") in entry["aaaModLR"]["attributes"]["dn"]:
-                    entry["aaaModLR"]["attributes"]["_ts"] = parse_timestamp(entry["aaaModLR"]["attributes"]["created"])
                     allCon.append(entry)
 
         else:
@@ -772,7 +775,6 @@ def getTotals(dateSorted):
         if r2 is None:
             if r1 is not None:
                 if r1.group("flt") in entry["aaaModLR"]["attributes"]["dn"]:
-                    entry["aaaModLR"]["attributes"]["_ts"] = parse_timestamp(entry["aaaModLR"]["attributes"]["created"])
                     allFlt.append(entry)
         else:
             continue
@@ -863,19 +865,19 @@ def env_setup(ip, usr, pwd, https, port):
 
 def reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC):
 
-    if reMapObjects[0] in entry["aaaModLR"]["attributes"]["dn"]:
+    if reMapObjects[0] in entry["aaaModLR"]["attributes"]["dn"] and isinstance(phyDom, str):
         entry["aaaModLR"]["attributes"]["dn"] = re.sub("rsdomAtt-\[[^]]+\]", "rsdomAtt-[%s]" % phyDom, entry["aaaModLR"]["attributes"]["dn"])
         entry["aaaModLR"]["attributes"]["changeSet"] = re.sub("tDn:[^ ,]+", "tDn:%s" % phyDom, entry["aaaModLR"]["attributes"]["changeSet"])
         entry["aaaModLR"]["attributes"]["affected"] = re.sub("rsdomAtt-\[[^]]+\]", "rsdomAtt-[%s]" % phyDom, entry["aaaModLR"]["attributes"]["affected"])
         entry["aaaModLR"]["attributes"]["descr"] = re.sub("uni.*(?=\s)", phyDom, entry["aaaModLR"]["attributes"]["descr"])
-    if reMapObjects[1] in entry["aaaModLR"]["attributes"]["dn"]:
+    if reMapObjects[1] in entry["aaaModLR"]["attributes"]["dn"] and isinstance(vmmDom, str):
         entry["aaaModLR"]["attributes"]["dn"] = re.sub("rsdomAtt-\[[^]]+\]", "rsdomAtt-[%s]" % vmmDom, entry["aaaModLR"]["attributes"]["dn"])
         entry["aaaModLR"]["attributes"]["changeSet"] = re.sub("tDn:[^ ,]+", "tDn:%s" % vmmDom, entry["aaaModLR"]["attributes"]["changeSet"])
         entry["aaaModLR"]["attributes"]["affected"] = re.sub("rsdomAtt-\[[^]]+\]", "rsdomAtt-[%s]" % vmmDom, entry["aaaModLR"]["attributes"]["affected"])
         entry["aaaModLR"]["attributes"]["descr"] = re.sub("uni.*(?=\s)", vmmDom, entry["aaaModLR"]["attributes"]["descr"])
-    if reMapObjects[2] in entry["aaaModLR"]["attributes"]["dn"]:
+    if reMapObjects[2] in entry["aaaModLR"]["attributes"]["dn"] and isinstance(l3Dom, str):
         entry["aaaModLR"]["attributes"]["changeSet"] = re.sub("tDn:[^ ,]+", "tDn:%s" % l3Dom, entry["aaaModLR"]["attributes"]["changeSet"])
-    if reMapObjects[3] in entry["aaaModLR"]["attributes"]["dn"]:
+    if reMapObjects[3] in entry["aaaModLR"]["attributes"]["dn"] and isinstance(port, str):
         entry["aaaModLR"]["attributes"]["dn"] = re.sub("rspathAtt-\[[^]]+\]", "rspathAtt-[%s" % port, entry["aaaModLR"]["attributes"]["dn"])
         entry["aaaModLR"]["attributes"]["changeSet"] = re.sub("tDn:[^ ,]+", "tDn:%s" % port, entry["aaaModLR"]["attributes"]["changeSet"])
         entry["aaaModLR"]["attributes"]["affected"] = re.sub("rspathAtt-\[[^]]+\]", "rspathAtt-[%s" % port, entry["aaaModLR"]["attributes"]["affected"])
@@ -884,14 +886,14 @@ def reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC):
         if l3If:
             r2 = re.search("(?P<l3if>rspathL3OutAtt-.*(?=pathep)pathep-\[eth1\/)", entry["aaaModLR"]["attributes"]["dn"])
             if r2 is not None:
-                if r2.group("l3if") in entry ["aaaModLR"]["attributes"]["dn"]:
+                if r2.group("l3if") in entry ["aaaModLR"]["attributes"]["dn"] and isinstance(l3If, str):
                     entry["aaaModLR"]["attributes"]["dn"] = re.sub("rspathL3OutAtt-\[[^]]+\]", "rspathL3OutAtt-[%s" % l3If, entry["aaaModLR"]["attributes"]["dn"])
                     entry["aaaModLR"]["attributes"]["changeSet"] = re.sub("tDn:[^ ,]+", "tDn:%s" % l3If, entry["aaaModLR"]["attributes"]["changeSet"])
                     entry["aaaModLR"]["attributes"]["affected"] = re.sub("rspathL3OutAtt-\[[^]]+\]", "rspathL3OutAtt-[%s" % l3If, entry["aaaModLR"]["attributes"]["affected"])
         if l3PC:
             r3 = re.search("(?P<l3PC>rspathL3OutAtt-\[topology\/pod-[0-9]+\/paths-(?P<node>[0-9]+)\/pathep-\[[^eth1\/]+)", entry["aaaModLR"]["attributes"]["dn"])
             if r3 is not None:
-                if r3.group("l3PC") in entry ["aaaModLR"]["attributes"]["dn"]:
+                if r3.group("l3PC") in entry ["aaaModLR"]["attributes"]["dn"] and isinstance(l3PC, str):
                     entry["aaaModLR"]["attributes"]["dn"] = re.sub("rspathL3OutAtt-\[[^]]+\]", "rspathL3OutAtt-[%s" % l3PC, entry["aaaModLR"]["attributes"]["dn"])
                     entry["aaaModLR"]["attributes"]["changeSet"] = re.sub("tDn:[^ ,]+", "tDn:%s" % l3PC, entry["aaaModLR"]["attributes"]["changeSet"])
                     entry["aaaModLR"]["attributes"]["affected"] = re.sub("rspathL3OutAtt-\[[^]]+\]", "rspathL3OutAtt-[%s" % l3PC, entry["aaaModLR"]["attributes"]["affected"])
@@ -905,7 +907,7 @@ def reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC):
             global node2
             node2 = r4.group("node2")
             if r5 is not None:
-                if r5.group("l3VPC") in entry ["aaaModLR"]["attributes"]["dn"]:
+                if r5.group("l3VPC") in entry ["aaaModLR"]["attributes"]["dn"] and isinstance(l3VPC, str):
                     entry["aaaModLR"]["attributes"]["dn"] = re.sub("rspathL3OutAtt-\[[^]]+\]", "rspathL3OutAtt-[%s" % l3VPC, entry["aaaModLR"]["attributes"]["dn"])
                     entry["aaaModLR"]["attributes"]["changeSet"] = re.sub("tDn:[^ ,]+", "tDn:%s" % l3VPC, entry["aaaModLR"]["attributes"]["changeSet"])
                     entry["aaaModLR"]["attributes"]["affected"] = re.sub("rspathL3OutAtt-\[[^]]+\]", "rspathL3OutAtt-[%s" % l3VPC, entry["aaaModLR"]["attributes"]["affected"])
@@ -923,27 +925,44 @@ def reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC):
 
     return entry
 
-def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3PC, l3VPC):
+def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3PC, l3VPC, catalog):
     if waitTime is not None:
         wait = int(waitTime)
     else:
         wait = 3
 
-    page = session.get("/doc/model/MESSAGE-CATALOG.txt")
+    if catalog is None:
+        # attempt to pull catalog from current apic session
+        page = session.get("/doc/model/MESSAGE-CATALOG.txt")
+        lines = page.content.split("\n")
+    else:
+        # read the provided catalog filename
+        try:
+            with open(catalog, "r") as f:
+                lines = f.readlines()
+        except IOError as e:
+                print "unable to read catalog file (%s): %s" % (catalog, e)
+                sys.exit(1)
     codes = {}
     current_code = None
-    event_code_regex = re.compile("\[EVENT CODE\]:[ \t]*(?P<event_code>E[0-9]+)")
+    event_code_regex = re.compile("\[EVENT CODE\]:[ \t]*E?(?P<event_code>[0-9]+)")
     class_code_regex = re.compile("(?i)\[MO CLASS\]:[ \t]*(?P<namespace>[a-z0-9+]+):(?P<class>[a-z0-9]+)")
-    for l in page.content.split("\n"):
-        if current_code is not None:
+    for l in lines:
+        if current_code is None:
+            r = event_code_regex.search(l)
+            if r is not None:
+                current_code = r.group("event_code")
+        else:
             r = class_code_regex.search(l)
             if r is not None:
                 codes[current_code] = r.group("namespace") + r.group("class")
                 current_code = None
-        else:
-            r = event_code_regex.search(l)
-            if r is not None:
-                current_code = r.group("event_code")
+    
+    # verify we were able to get at few catalog codes
+    if len(codes)<1:
+        from_apic = "(pulled from APIC)" if catalog is None else "from provided catalog file %s" % catalog
+        print "unable to find event codes in catalog %s" % from_apic
+        sys.exit(1)
 
     """
     # Need to build a dictionary of all Classes to use for each POST
@@ -1071,10 +1090,12 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3
                 for m in r3:
                     attributes[m.group("key")] = m.group("value")
                 #r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
-                if entry["aaaModLR"]["attributes"]["code"] in codes:
-                    className = codes[entry["aaaModLR"]["attributes"]["code"]]
+                code = re.sub("^E","", entry["aaaModLR"]["attributes"]["code"])
+                if code in codes:
+                    className = codes[code]
                 else:
-                    print "Could not find Audit Code in Code List.  Are you running the same version as Audits?"
+                    print "Could not find Audit Code (%s) in Code List.  Are you running the same version as Audits?"%(
+                        code)
                     sys.exit()
 
                 """
@@ -1253,7 +1274,7 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, l3If, l3
 
 
 
-def main(file, ip, username, password, https, port, waitTime, step, xml, json):
+def main(file, ip, username, password, https, port, waitTime, step, xml, json, catalog, start_time, end_time):
 
     # Get Connection Info From User and Build a Session Object to APIC
     session = env_setup(ip, username, password, https, port)
@@ -1264,23 +1285,37 @@ def main(file, ip, username, password, https, port, waitTime, step, xml, json):
         # Sort the JSON
         dateSorted = jsonParser(file)
 
+    # remove anything outside of start/end timestamps
+    min_time = 0 if start_time is None else start_time
+    max_time = 0xfffffffffffffff if end_time is None else end_time
+    filtered = []
+    for a in dateSorted:
+        if a["aaaModLR"]["attributes"]["_ts"] >= min_time and a["aaaModLR"]["attributes"]["_ts"] <= max_time:
+            filtered.append(a)
+        else:
+            logger.debug("skipping audit %.02f outside of range (%s, %s)" % (a["aaaModLR"]["attributes"]["_ts"],
+                min_time, max_time))
+    dateSorted = filtered
+    if start_time is not None or end_time is not None:
+        print "Number of filtered Changes :                        %s" % len(dateSorted)
+
     #prettyPrint =  json.dumps(dateSorted, indent=2)
     #print prettyPrint
 
     # Get Totals and Determine if VMM/Phys Domains are in use.  Also determine what interfaces are used for L3 Out
     all, allTN, allVrf, allL3Out, allApp, allEPG, allBD, allCon, allFlt, l3If, l3PC, l3VPC, vmm, phys, mgmt = getTotals(dateSorted)
 
-    if mgmt == True:
+    if mgmt is True:
         print "Found Changes to MGMT Tenant. Skipping...!"
-    if vmm == True:
+    if vmm is True:
         print "Found VMM Domains in EPG Audits!"
-    if phys == True:
+    if phys is True:
         print "Found Physical Domains in EPG Audits!"
-    if l3If == True:
+    if l3If is True:
         print "Found Routed Interfaces / Sub-Interfaces in L3 Out Audits!"
-    if l3PC == True:
+    if l3PC is True:
         print "Found PC Interfaces in L3 Out Audits!"
-    if l3VPC == True:
+    if l3VPC is True:
         print "Found VPC Interfaces in L3 Out Audits!"
 
     print "\n"
@@ -1316,7 +1351,7 @@ def main(file, ip, username, password, https, port, waitTime, step, xml, json):
     print "\n"
 
 
-    replayAudits(session, selection, selections[selection], waitTime, step, vmm, phys, l3If, l3PC, l3VPC)
+    replayAudits(session, selection, selections[selection], waitTime, step, vmm, phys, l3If, l3PC, l3VPC, catalog)
 
 
 if __name__ == "__main__":
@@ -1332,10 +1367,31 @@ if __name__ == "__main__":
     parser.add_argument("--password", action="store", dest="password",help="admin password", default=None)
     parser.add_argument("--https", action="store_true", dest="https",help="Specifies whether to use HTTPS authentication", default=None)
     parser.add_argument("--port", action="store", dest="port",help="port number to use for APIC communicaton", default=None)
+    parser.add_argument("--catalog", action="store", dest="catalog", default=None,
+        help="manually specify MESSAGE-CATALOG.txt from version of code audits were pulled from")
+    parser.add_argument("--startTime", action="store", dest="startTime",
+        help="Time to begin deploying Audits.  Must be in the following Format: YYYY-MM-DDTHH:MM:SS", default=None)
+    parser.add_argument("--endTime", action="store", dest="endTime",
+        help="Time to Stop deploying Audits.  Must be in the following Format: YYYY-MM-DDTHH:MM:SS", default=None)
     parser.add_argument("--waitTime", action="store", dest="time",help="Time in seconds to wait between changes", default=None)
     parser.add_argument("--step", action="store_true", dest="step",help="Prompt For User input between each step", default=None)
     parser.add_argument("--debug", action="store", help="debug level", dest="debug", default="ERROR")
     args = parser.parse_args()
+
+    start_time = args.startTime
+    end_time = args.endTime
+    if start_time is not None:
+        start_time = parse_timestamp(start_time)
+        if start_time is None: 
+            print "invalid start time %s (use --help for help)" % args.startTime
+            sys.exit(1)
+    if end_time is not None:
+        end_time = parse_timestamp(end_time)
+        if end_time is None: 
+            print "invalid end time %s (use --help for help)" % args.endTime
+            sys.exit(1)
+
+    
 
     # configure logging
     logger = logging.getLogger("")
@@ -1355,5 +1411,6 @@ if __name__ == "__main__":
     if args.debug == "WARN": logger.setLevel(logging.WARN)
     if args.debug == "ERROR": logger.setLevel(logging.ERROR)
 
-    main(args.file, args.ip, args.username, args.password, args.https, args.port, args.time, args.step, args.xml, args.json)
+    main(args.file, args.ip, args.username, args.password, args.https, args.port, args.time, args.step, args.xml, 
+        args.json, args.catalog, start_time, end_time)
 
