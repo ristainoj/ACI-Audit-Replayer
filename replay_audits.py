@@ -298,6 +298,7 @@ def getL3UserInfo(session, l3If=False, l3PC=False, l3VPC=False):
                     l3Dom = value
     print "\n"
     print 'You have chosen "%s"\n' % l3Dom
+    print type(l3Dom)
 
     #################################
     # GET infraAccBaseGrp from APIC #
@@ -307,67 +308,67 @@ def getL3UserInfo(session, l3If=False, l3PC=False, l3VPC=False):
     PolGrpJS = polGrpResp.json()
 
     if (l3If and l3PC and l3VPC):
-        type = "All"
+        l3_type = "All"
     elif (l3If and l3PC):
-        type = "If-PC"
+        l3_type = "If-PC"
     elif (l3If and l3VPC):
-        type = "If-VPC"
+        l3_type = "If-VPC"
     elif (l3If):
-        type = "If"
+        l3_type = "If"
     elif (l3PC and l3VPC):
-        type = "PC-SVI"
+        l3_type = "PC-SVI"
     elif l3PC:
-        type = "PC"
+        l3_type = "PC"
     elif l3VPC:
-        type = "VPC"
+        l3_type = "VPC"
     else:
-        type = None
+        l3_type = None
 
     print "\n"
 
-    if type == "All":
+    if l3_type == "All":
         print "Since Routed Ints/SubInts, PCs, and SVIs are used, we will need to select all options for replacement"
         l3If = getL3Int(session)
         l3PC = getL3PC(session)
         l3VPC = getL3VPC(session)
 
-    elif type == "If-PC":
+    elif l3_type == "If-PC":
         print "Since Routed Ints/SubInts, and PCs are used, we will need to select all options for replacement"
         l3If = getL3Int(session)
         l3PC = getL3PC(session)
         l3VPC = False
 
-    elif type == "If-VPC":
+    elif l3_type == "If-VPC":
         print "Since Routed Ints/SubInts, and VPCs are used, we will need to select all options for replacement"
         l3If = getL3Int(session)
         l3PC = False
         l3VPC = getL3VPC(session)
 
-    elif type == "If":
+    elif l3_type == "If":
         print "Since Routed Ints/SubInts are used, we will need to select all options for replacement"
         l3If = getL3Int(session)
         l3PC = False
         l3VPC = False
 
-    elif type == "PC-SVI":
+    elif l3_type == "PC-SVI":
         print "Since PCs and VPCs are used, we will need to select all options for replacement"
         l3If = False
         l3PC = getL3PC(session)
         l3VPC = getL3VPC(session)
 
-    elif type == "PC":
+    elif l3_type == "PC":
         print "Since PCs are used, we will need to select which PC for replacement"
         l3If = False
         l3PC = getL3PC(session)
         l3VPC = False
 
-    elif type == "VPC":
+    elif l3_type == "VPC":
         print "Since VPCs are used, we will need to select which VPC to use for replacement"
         l3If = False
         l3PC = False
         l3VPC = getL3VPC(session)
 
-    return l3Dom, l3If, l3PC, l3VPC
+    return str(l3Dom), str(l3If), str(l3PC), str(l3VPC)
 
 
 def getL3PC(session):
@@ -446,7 +447,7 @@ def getL3PC(session):
     print 'You have chosen "%s"' % l3PCBundle
     print "\n"
 
-    return l3PCBundle
+    return str(l3PCBundle)
 
 def getL3VPC(session):
     polGrpDNList = []
@@ -523,7 +524,7 @@ def getL3VPC(session):
     print 'You have chosen "%s"' % l3VPCBundle
     print "\n"
 
-    return l3VPCBundle
+    return str(l3VPCBundle)
 
 def getL3Int(session):
 
@@ -881,6 +882,7 @@ def reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC):
         entry["aaaModLR"]["attributes"]["affected"] = re.sub("rsdomAtt-\[[^]]+\]", "rsdomAtt-[%s]" % vmmDom, entry["aaaModLR"]["attributes"]["affected"])
         entry["aaaModLR"]["attributes"]["descr"] = re.sub("uni.*(?=\s)", vmmDom, entry["aaaModLR"]["attributes"]["descr"])
     if reMapObjects[2] in entry["aaaModLR"]["attributes"]["dn"] and isinstance(l3Dom, str):
+        print l3Dom
         entry["aaaModLR"]["attributes"]["changeSet"] = re.sub("tDn:[^ ,]+", "tDn:%s" % l3Dom, entry["aaaModLR"]["attributes"]["changeSet"])
     if reMapObjects[3] in entry["aaaModLR"]["attributes"]["dn"] and isinstance(port, str):
         entry["aaaModLR"]["attributes"]["dn"] = re.sub("rspathAtt-\[[^]]+\]", "rspathAtt-[%s" % port, entry["aaaModLR"]["attributes"]["dn"])
@@ -931,8 +933,13 @@ def reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC):
     return entry
 
 def replayAudits(session, selection, audits, waitTime, step, vmm, phys, port, l3If, l3PC, l3VPC, catalog):
-    if waitTime is not None:
+
+    if waitTime and step:
+        wait = 0
+    elif waitTime:
         wait = int(waitTime)
+    elif step:
+        wait = 0
     else:
         wait = 3
 
@@ -995,11 +1002,10 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, port, l3
         l3Dom = False
         l3If = False
         l3PC = False
-        l3V
-        PC = False
+        l3VPC = False
+
     for entry in audits:
         try:
-            #if selection == "1":
             prettyPrint =  json.dumps(entry, indent=2)
             print prettyPrint
             if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion":
