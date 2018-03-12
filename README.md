@@ -7,22 +7,30 @@ When you run the scipt, you can specify a number of parameters:
 JRISTAIN-M-D3NK:Replay_Audits josephristaino$ python replay_audits.py --help
 usage: replay_audits.py [-h] [--file FILE] [--xml] [--json] [--ip IP]
                         [--username USERNAME] [--password PASSWORD] [--https]
-                        [--port PORT] [--waitTime TIME] [--step]
-                        [--debug DEBUG]
+                        [--port PORT] [--catalog CATALOG]
+                        [--startTime STARTTIME] [--endTime ENDTIME]
+                        [--waitTime TIME] [--step] [--debug DEBUG]
 
 optional arguments:
-  -h, --help           show this help message and exit
-  --file FILE          filename
-  --xml                input in xml format
-  --json               input in json format
-  --ip IP              APIC URL
-  --username USERNAME  admin username
-  --password PASSWORD  admin password
-  --https              Specifies whether to use HTTPS authentication
-  --port PORT          port number to use for APIC communicaton
-  --waitTime TIME      Time in seconds to wait between changes
-  --step               Prompt For User input between each step
-  --debug DEBUG        debug level
+  -h, --help            show this help message and exit
+  --file FILE           filename
+  --xml                 input in xml format
+  --json                input in json format
+  --ip IP               APIC URL
+  --username USERNAME   admin username
+  --password PASSWORD   admin password
+  --https               Specifies whether to use HTTPS authentication
+  --port PORT           port number to use for APIC communicaton
+  --catalog CATALOG     manually specify MESSAGE-CATALOG.txt from version of
+                        code audits were pulled from
+  --startTime STARTTIME
+                        Time to begin deploying Audits. Must be in the
+                        following Format: YYYY-MM-DDTHH:MM:SS
+  --endTime ENDTIME     Time to Stop deploying Audits. Must be in the
+                        following Format: YYYY-MM-DDTHH:MM:SS
+  --waitTime TIME       Time in seconds to wait between changes
+  --step                Prompt For User input between each step
+  --debug DEBUG         debug level
   
   The Script detects what config changes have been made and will prompt you for interfaces and domains to use to "replace" when the config is pushed.
   This way you can run the script on any fabric and use interfaces/domains from that Fabric against any Audit Log.
@@ -39,5 +47,4 @@ optional arguments:
 
 ```
 1) Be able to wait the exact amount of time between changes as the original time it was deployed.
-2) Be able to point to the location of the APIC catalog file s it can be run on a newer version that the system the Audits were collected on
 ```
