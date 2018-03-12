@@ -23,8 +23,7 @@ optional arguments:
   --port PORT           port number to use for APIC communicaton
   --catalog CATALOG     manually specify MESSAGE-CATALOG.txt from version of
                         code audits were pulled from
-  --startTime STARTTIME
-                        Time to begin deploying Audits. Must be in the
+  --startTime STARTTIME Time to begin deploying Audits. Must be in the
                         following Format: YYYY-MM-DDTHH:MM:SS
   --endTime ENDTIME     Time to Stop deploying Audits. Must be in the
                         following Format: YYYY-MM-DDTHH:MM:SS
