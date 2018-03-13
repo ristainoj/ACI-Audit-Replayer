@@ -645,145 +645,92 @@ def getTotals(dateSorted):
 
     #Total Global Tenant Objects
     all = []
+    allTN = []
+    allVrf = []
+    allL3Out = []
+    allApp = []
+    allEPG = []
+    allBD = []
+    allCon = []
+    allFlt = []
+
     for entry in dateSorted:
         r1 = re.search("uni\/(?P<gltn>tn-)", entry["aaaModLR"]["attributes"]["dn"])
         r2 = re.search("tn-mgmt", entry["aaaModLR"]["attributes"]["dn"])
+        #Tenant Parent Object
+        r3 = re.search("uni\/tn-(?P<tn>[^\]\/]+)\]", entry["aaaModLR"]["attributes"]["dn"])
+        #VRF Parent Object
+        r4 = re.search("uni\/tn-.*\/(?P<vrf>ctx-)", entry["aaaModLR"]["attributes"]["dn"])
+        #L3Out Parent Object
+        r5 = re.search("uni\/tn-.*\/(?P<l3>out-)", entry["aaaModLR"]["attributes"]["dn"])
+        #APP Profile Parent Object
+        r6 = re.search("uni\/tn-.*\/ap-(?P<app>[^\]/]+)\]", entry["aaaModLR"]["attributes"]["dn"])
+        #EPG Profile Parent Object
+        r7 = re.search("uni\/tn-.*\/(?P<epg>epg-)", entry["aaaModLR"]["attributes"]["dn"])
+        #BD Profile Parent Object
+        r8 = re.search("uni\/tn-.*\/(?P<bd>BD-)", entry["aaaModLR"]["attributes"]["dn"])
+        #Contract Profile Parent Object
+        r9 = re.search("uni\/tn-.*\/(?P<con>brc-)", entry["aaaModLR"]["attributes"]["dn"])
+        #Filter Profile Parent Object
+        r10 = re.search("uni\/tn-.*\/(?P<flt>flt-)", entry["aaaModLR"]["attributes"]["dn"])
         if r2 is None:
             if r1 is not None:
                 if r1.group("gltn") in entry["aaaModLR"]["attributes"]["dn"]:
                     all.append(entry)
+            if r3 is not None:
+                if r3.group("tn") in entry["aaaModLR"]["attributes"]["dn"]:
+                    allTN.append(entry)
+            if r4 is not None:
+                if r4.group("vrf") in entry["aaaModLR"]["attributes"]["dn"]:
+                    allVrf.append(entry)
+            if r5 is not None:
+                if r5.group("l3") in entry["aaaModLR"]["attributes"]["dn"]:
+                    allL3Out.append(entry)
+                    path_reg = re.search("(?P<l3if>rspathL3OutAtt-.*(?=pathep)pathep-\[eth1\/)", entry["aaaModLR"]["attributes"]["dn"])
+                    if path_reg is not None:
+                        if path_reg.group("l3if") in entry ["aaaModLR"]["attributes"]["dn"]:
+                            l3If = True
+                    pc_reg = re.search("(?P<l3PC>rspathL3OutAtt-\[topology\/pod-[0-9]+\/paths-(?P<node>[0-9]+)\/pathep-\[[^eth1\/]+)",
+                                   entry["aaaModLR"]["attributes"]["dn"])
+                    if pc_reg is not None:
+                        if pc_reg.group("l3PC") in entry ["aaaModLR"]["attributes"]["dn"]:
+                            l3PC = True
+                    vpc_reg = re.search("(?P<l3VPC>rspathL3OutAtt-.*(?=protpaths)protpaths-(?P<node1>[0-9]+))\-(?P<node2>[0-9]+)",
+                                   entry["aaaModLR"]["attributes"]["dn"])
+                    if vpc_reg is not None:
+                        if vpc_reg.group("l3VPC") in entry ["aaaModLR"]["attributes"]["dn"]:
+                            l3VPC = True
+            if r6 is not None:
+                if r6.group("app") in entry["aaaModLR"]["attributes"]["dn"]:
+                    allApp.append(entry)
+            if r7 is not None:
+                if r7.group("epg") in entry["aaaModLR"]["attributes"]["dn"]:
+                    allEPG.append(entry)
+                    vmm_dom = re.search("(?P<vmm>rsdomAtt-\[uni\/vmmp-VMware)", entry["aaaModLR"]["attributes"]["dn"])
+                    if vmm_dom is not None:
+                        if vmm_dom.group("vmm") in entry ["aaaModLR"]["attributes"]["dn"]:
+                            vmm = True
+                    phy_dom = re.search("(?P<phys>rsdomAtt-\[uni\/phys-)", entry["aaaModLR"]["attributes"]["dn"])
+                    if phy_dom is not None:
+                        if phy_dom.group("phys") in entry["aaaModLR"]["attributes"]["dn"]:
+                            phys = True
+                    path = re.search("(?P<port>rspathAtt-\[topology)", entry["aaaModLR"]["attributes"]["dn"])
+                    if path is not None:
+                        if path.group("port") in entry["aaaModLR"]["attributes"]["dn"]:
+                            port = True
+            if r8 is not None:
+                if r8.group("bd") in entry["aaaModLR"]["attributes"]["dn"]:
+                    allBD.append(entry)
+            if r9 is not None:
+                if r9.group("con") in entry["aaaModLR"]["attributes"]["dn"]:
+                    allCon.append(entry)
+            if r10 is not None:
+                if r10.group("flt") in entry["aaaModLR"]["attributes"]["dn"]:
+                    allFlt.append(entry)
         else:
             mgmt = True
             continue
 
-
-    #Total Tenant Objects
-    allTN = []
-    for entry in dateSorted:
-        r1 = re.search("uni\/tn-(?P<tn>[^\]\/]+)\]", entry["aaaModLR"]["attributes"]["dn"])
-        r2 = re.search("tn-mgmt", entry["aaaModLR"]["attributes"]["dn"])
-        if r2 is None:
-            if r1 is not None:
-                if r1.group("tn") in entry["aaaModLR"]["attributes"]["dn"]:
-                    allTN.append(entry)
-
-        else:
-            continue
-
-    #Total VRF Objects
-    allVrf = []
-    for entry in dateSorted:
-        r1 = re.search("uni\/tn-.*\/(?P<vrf>ctx-)", entry["aaaModLR"]["attributes"]["dn"])
-        r2 = re.search("tn-mgmt", entry["aaaModLR"]["attributes"]["dn"])
-        if r2 is None:
-            if r1 is not None:
-                if r1.group("vrf") in entry["aaaModLR"]["attributes"]["dn"]:
-                    allVrf.append(entry)
-
-        else:
-            continue
-
-    #Total L3Out Objects
-    allL3Out = []
-    for entry in dateSorted:
-        r1 = re.search("uni\/tn-.*\/(?P<l3>out-)", entry["aaaModLR"]["attributes"]["dn"])
-        r2 = re.search("tn-mgmt", entry["aaaModLR"]["attributes"]["dn"])
-        if r2 is None:
-            if r1 is not None:
-                if r1.group("l3") in entry["aaaModLR"]["attributes"]["dn"]:
-                    allL3Out.append(entry)
-                    r2 = re.search("(?P<l3if>rspathL3OutAtt-.*(?=pathep)pathep-\[eth1\/)", entry["aaaModLR"]["attributes"]["dn"])
-                    if r2 is not None:
-                        if r2.group("l3if") in entry ["aaaModLR"]["attributes"]["dn"]:
-                            l3If = True
-                    r3 = re.search("(?P<l3PC>rspathL3OutAtt-\[topology\/pod-[0-9]+\/paths-(?P<node>[0-9]+)\/pathep-\[[^eth1\/]+)",
-                                   entry["aaaModLR"]["attributes"]["dn"])
-                    if r3 is not None:
-                        if r3.group("l3PC") in entry ["aaaModLR"]["attributes"]["dn"]:
-                            l3PC = True
-                    r4 = re.search("(?P<l3VPC>rspathL3OutAtt-.*(?=protpaths)protpaths-(?P<node1>[0-9]+))\-(?P<node2>[0-9]+)",
-                                   entry["aaaModLR"]["attributes"]["dn"])
-                    if r4 is not None:
-                        if r4.group("l3VPC") in entry ["aaaModLR"]["attributes"]["dn"]:
-                            l3VPC = True
-
-        else:
-            continue
-
-    #Total App Profile Objects
-    allApp = []
-    for entry in dateSorted:
-        r1 = re.search("uni\/tn-.*\/ap-(?P<app>[^\]/]+)\]", entry["aaaModLR"]["attributes"]["dn"])
-        r2 = re.search("tn-mgmt", entry["aaaModLR"]["attributes"]["dn"])
-        if r2 is None:
-            if r1 is not None:
-                if r1.group("app") in entry["aaaModLR"]["attributes"]["dn"]:
-                    allApp.append(entry)
-
-        else:
-            continue
-
-    #Total EPG Objects
-    allEPG = []
-    for entry in dateSorted:
-        r1 = re.search("uni\/tn-.*\/(?P<epg>epg-)", entry["aaaModLR"]["attributes"]["dn"])
-        r2 = re.search("tn-mgmt", entry["aaaModLR"]["attributes"]["dn"])
-        if r2 is None:
-            if r1 is not None:
-                if r1.group("epg") in entry["aaaModLR"]["attributes"]["dn"]:
-                    allEPG.append(entry)
-                    r2 = re.search("(?P<vmm>rsdomAtt-\[uni\/vmmp-VMware)", entry["aaaModLR"]["attributes"]["dn"])
-                    if r2 is not None:
-                        if r2.group("vmm") in entry ["aaaModLR"]["attributes"]["dn"]:
-                            vmm = True
-                    r3 = re.search("(?P<phys>rsdomAtt-\[uni\/phys-)", entry["aaaModLR"]["attributes"]["dn"])
-                    if r3 is not None:
-                        if r3.group("phys") in entry["aaaModLR"]["attributes"]["dn"]:
-                            phys = True
-                    r4 = re.search("(?P<port>rspathAtt-\[topology)", entry["aaaModLR"]["attributes"]["dn"])
-                    if r4 is not None:
-                        if r4.group("port") in entry["aaaModLR"]["attributes"]["dn"]:
-                            port = True
-        else:
-            continue
-
-    #Total BD Objects
-    allBD = []
-    for entry in dateSorted:
-        r1 = re.search("uni\/tn-.*\/(?P<bd>BD-)", entry["aaaModLR"]["attributes"]["dn"])
-        r2 = re.search("tn-mgmt", entry["aaaModLR"]["attributes"]["dn"])
-        if r2 is None:
-            if r1 is not None:
-                if r1.group("bd") in entry["aaaModLR"]["attributes"]["dn"]:
-                    allBD.append(entry)
-
-        else:
-            continue
-
-    #Total Contract Objects
-    allCon = []
-    for entry in dateSorted:
-        r1 = re.search("uni\/tn-.*\/(?P<con>brc-)", entry["aaaModLR"]["attributes"]["dn"])
-        r2 = re.search("tn-mgmt", entry["aaaModLR"]["attributes"]["dn"])
-        if r2 is None:
-            if r1 is not None:
-                if r1.group("con") in entry["aaaModLR"]["attributes"]["dn"]:
-                    allCon.append(entry)
-
-        else:
-            continue
-
-    #Total Filter Objects
-    allFlt = []
-    for entry in dateSorted:
-        r1 = re.search("uni\/tn-.*\/(?P<flt>flt-)", entry["aaaModLR"]["attributes"]["dn"])
-        r2 = re.search("tn-mgmt", entry["aaaModLR"]["attributes"]["dn"])
-        if r2 is None:
-            if r1 is not None:
-                if r1.group("flt") in entry["aaaModLR"]["attributes"]["dn"]:
-                    allFlt.append(entry)
-        else:
-            continue
 
     print "The Total number of Global Tenant Config Changes:   %s" % len(all)
     print "The Total number of Tenant Config Changes:          %s" % len(allTN)
