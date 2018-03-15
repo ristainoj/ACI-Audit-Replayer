@@ -3,6 +3,7 @@ __author__ = 'josephristaino'
 import os, sys, logging, getpass, re, json, time, requests
 from acisession import Session
 from lxml import html
+from codes import codes
 import lxml.etree as etree
 import dateutil
 import dateutil.parser
@@ -35,13 +36,13 @@ reMapObjects = [
     ]
 
 def parse_timestamp(ts_str):
-    """ return float unix timestamp for timestamp string 
+    """ return float unix timestamp for timestamp string
         return None on error
     """
     try:
         dt = dateutil.parser.parse(ts_str, yearfirst=True, fuzzy=True)
         return (time.mktime(dt.timetuple()) + dt.microsecond/1000000.0)
-    except ValueError as e: 
+    except ValueError as e:
         return None
 
 def getVMMUserInfo(session):
@@ -902,7 +903,7 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, port, l3
         except IOError as e:
                 print "unable to read catalog file (%s): %s" % (catalog, e)
                 sys.exit(1)
-    codes = {}
+    
     current_code = None
     event_code_regex = re.compile("\[EVENT CODE\]:[ \t]*E?(?P<event_code>[0-9]+)")
     class_code_regex = re.compile("(?i)\[MO CLASS\]:[ \t]*(?P<namespace>[a-z0-9+]+):(?P<class>[a-z0-9]+)")
@@ -916,7 +917,7 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, port, l3
             if r is not None:
                 codes[current_code] = r.group("namespace") + r.group("class")
                 current_code = None
-    
+
     # verify we were able to get at few catalog codes
     if len(codes)<1:
         from_apic = "(pulled from APIC)" if catalog is None else "from provided catalog file %s" % catalog
@@ -1078,7 +1079,7 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, port, l3
                                 entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
                             elif (vmm and phys and l3If and l3PC):
                                 entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, False)
-                            elif (vmm and phys and l3If and l3SVI):
+                            elif (vmm and phys and l3If and l3VPC):
                                 entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, False, l3VPC)
                             elif (vmm and phys and l3If):
                                 entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, False, False)
@@ -1296,16 +1297,16 @@ if __name__ == "__main__":
     end_time = args.endTime
     if start_time is not None:
         start_time = parse_timestamp(start_time)
-        if start_time is None: 
+        if start_time is None:
             print "invalid start time %s (use --help for help)" % args.startTime
             sys.exit(1)
     if end_time is not None:
         end_time = parse_timestamp(end_time)
-        if end_time is None: 
+        if end_time is None:
             print "invalid end time %s (use --help for help)" % args.endTime
             sys.exit(1)
 
-    
+
 
     # configure logging
     logger = logging.getLogger("")
@@ -1325,6 +1326,6 @@ if __name__ == "__main__":
     if args.debug == "WARN": logger.setLevel(logging.WARN)
     if args.debug == "ERROR": logger.setLevel(logging.ERROR)
 
-    main(args.file, args.ip, args.username, args.password, args.https, args.port, args.time, args.step, args.xml, 
+    main(args.file, args.ip, args.username, args.password, args.https, args.port, args.time, args.step, args.xml,
         args.json, args.catalog, start_time, end_time)
 
