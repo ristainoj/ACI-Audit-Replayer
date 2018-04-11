@@ -599,7 +599,6 @@ def jsonParser(file, tenant):
 
 def xmlParser(file, tenant):
     audits = []
-    tenantFiltered = []
     with open(file, "r") as f:
         root = etree.parse(f)
         for e in root.findall("./aaaModLR"):
@@ -607,15 +606,8 @@ def xmlParser(file, tenant):
 
     print "The Total number of Changes:                        %s" % len(audits)
 
-    if tenant:
-        for entry in audits:
-            r1 = re.search("uni\/(?P<tn>tn-%s)" % tenant, entry["aaaModLR"]["attributes"]["dn"])
-            if r1 is not None:
-                if r1.group("tn") in entry["aaaModLR"]["attributes"]["dn"]:
-                    tenantFiltered.append(entry)
-                    return sortAudits(tenantFiltered)
-    else:
-        return sortAudits(audits)
+    return sortAudits(audits, tenant)
+
 
 def sortAudits(audits, tenant):
     """
@@ -645,6 +637,7 @@ def sortAudits(audits, tenant):
             if r1 is not None:
                 if r1.group("tn") in entry["aaaModLR"]["attributes"]["dn"]:
                     tenantFiltered.append(entry)
+        print "The Total number of Selected Tenant Changes:        %s" % len(tenantFiltered)
         return tenantFiltered
     else:
         return results
@@ -1346,7 +1339,6 @@ if __name__ == "__main__":
     if args.debug == "WARN": logger.setLevel(logging.WARN)
     if args.debug == "ERROR": logger.setLevel(logging.ERROR)
 
-    print args.tenant
 
     main(args.file, args.ip, args.username, args.password, args.https, args.port, args.time, args.step, args.xml,
         args.json, args.catalog, start_time, end_time, args.tenant)
