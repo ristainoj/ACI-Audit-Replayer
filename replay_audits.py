@@ -587,27 +587,37 @@ def getL3Int(session):
 
     return l3Port
 
-def jsonParser(file):
+def jsonParser(file, tenant):
     with open(file, "r") as js:
         parsed = json.load(js)
 
     totalEntries = parsed['totalCount']
     print "The Total number of Changes:                        %s" % len(parsed["imdata"])
 
-    return sortAudits(parsed["imdata"])
+    return sortAudits(parsed["imdata"], tenant)
 
 
-def xmlParser(file):
+def xmlParser(file, tenant):
     audits = []
+    tenantFiltered = []
     with open(file, "r") as f:
         root = etree.parse(f)
         for e in root.findall("./aaaModLR"):
             audits.append({"aaaModLR": {"attributes":dict(e.attrib)}})
 
     print "The Total number of Changes:                        %s" % len(audits)
-    return sortAudits(audits)
 
-def sortAudits(audits):
+    if tenant:
+        for entry in audits:
+            r1 = re.search("uni\/(?P<tn>tn-%s)" % tenant, entry["aaaModLR"]["attributes"]["dn"])
+            if r1 is not None:
+                if r1.group("tn") in entry["aaaModLR"]["attributes"]["dn"]:
+                    tenantFiltered.append(entry)
+                    return sortAudits(tenantFiltered)
+    else:
+        return sortAudits(audits)
+
+def sortAudits(audits, tenant):
     """
     sort audits based on timestamp with oldest timestamp first.  For audits that have exact timestamp, the object with
     shortest dn string is first.
@@ -623,12 +633,21 @@ def sortAudits(audits):
         buckets[ts].append(a)
 
     results = []
+    tenantFiltered = []
     for ts in sorted(buckets):
         b = buckets[ts]
         for a in sorted(b, key=lambda b: len(b["aaaModLR"]["attributes"]["dn"])):
             results.append(a)
 
-    return results
+    if tenant:
+        for entry in results:
+            r1 = re.search("uni\/(?P<tn>tn-%s)" % tenant, entry["aaaModLR"]["attributes"]["dn"])
+            if r1 is not None:
+                if r1.group("tn") in entry["aaaModLR"]["attributes"]["dn"]:
+                    tenantFiltered.append(entry)
+        return tenantFiltered
+    else:
+        return results
 
 
 
@@ -903,7 +922,7 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, port, l3
         except IOError as e:
                 print "unable to read catalog file (%s): %s" % (catalog, e)
                 sys.exit(1)
-    
+
     current_code = None
     event_code_regex = re.compile("\[EVENT CODE\]:[ \t]*E?(?P<event_code>[0-9]+)")
     class_code_regex = re.compile("(?i)\[MO CLASS\]:[ \t]*(?P<namespace>[a-z0-9+]+):(?P<class>[a-z0-9]+)")
@@ -1187,16 +1206,16 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, port, l3
             continue
 
 
-def main(file, ip, username, password, https, port, waitTime, step, xml, json, catalog, start_time, end_time):
+def main(file, ip, username, password, https, port, waitTime, step, xml, json, catalog, start_time, end_time, tenant):
 
     # Get Connection Info From User and Build a Session Object to APIC
     session = env_setup(ip, username, password, https, port)
 
     if xml:
-        dateSorted = xmlParser(file)
+        dateSorted = xmlParser(file, tenant)
     elif json:
         # Sort the JSON
-        dateSorted = jsonParser(file)
+        dateSorted = jsonParser(file, tenant)
 
     # remove anything outside of start/end timestamps
     min_time = 0 if start_time is None else start_time
@@ -1291,6 +1310,7 @@ if __name__ == "__main__":
     parser.add_argument("--waitTime", action="store", dest="time",help="Time in seconds to wait between changes", default=None)
     parser.add_argument("--step", action="store_true", dest="step",help="Prompt For User input between each step", default=None)
     parser.add_argument("--debug", action="store", help="debug level", dest="debug", default="ERROR")
+    parser.add_argument("--tenant", action="store", help="Tenant You Wish to Replay Audits For", dest="tenant", default=None)
     args = parser.parse_args()
 
     start_time = args.startTime
@@ -1326,6 +1346,8 @@ if __name__ == "__main__":
     if args.debug == "WARN": logger.setLevel(logging.WARN)
     if args.debug == "ERROR": logger.setLevel(logging.ERROR)
 
+    print args.tenant
+
     main(args.file, args.ip, args.username, args.password, args.https, args.port, args.time, args.step, args.xml,
-        args.json, args.catalog, start_time, end_time)
+        args.json, args.catalog, start_time, end_time, args.tenant)
 
