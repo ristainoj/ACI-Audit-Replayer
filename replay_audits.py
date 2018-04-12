@@ -81,7 +81,7 @@ def getVMMUserInfo(session):
             vmmDom = value
     print "\n"
     print 'You have chosen "%s"\n' % vmmDom
-    return vmmDom
+    return str(vmmDom)
 
 def getPhyUserInfo(session):
 
@@ -219,7 +219,7 @@ def getPhyUserInfo(session):
         print "\n"
         print 'You have chosen "%s"\n' % port
 
-        return phyDom, port
+        return str(phyDom), str(port)
     else:
         # Get POD
         podChoice = None
@@ -261,7 +261,7 @@ def getPhyUserInfo(session):
             print "unable to find port in Fabric"
             sys.exit()
 
-        return phyDom, port
+        return str(phyDom), str(port)
 
 def getL3UserInfo(session, l3If=False, l3PC=False, l3VPC=False):
 
@@ -299,7 +299,6 @@ def getL3UserInfo(session, l3If=False, l3PC=False, l3VPC=False):
                     l3Dom = value
     print "\n"
     print 'You have chosen "%s"\n' % l3Dom
-    print type(l3Dom)
 
     #################################
     # GET infraAccBaseGrp from APIC #
@@ -585,7 +584,7 @@ def getL3Int(session):
         print "unable to find port in Fabric"
         sys.exit()
 
-    return l3Port
+    return str(l3Port)
 
 def jsonParser(file, tenant):
     with open(file, "r") as js:
@@ -868,11 +867,12 @@ def reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC):
             r4 = re.search("topology\/pod-(?P<pod>[0-9])\/protpaths-(?P<node1>[0-9]+)\-(?P<node2>[0-9]+)", str(l3VPC))
             r5 = re.search("(?P<l3VPC>rspathL3OutAtt-.*(?=protpaths)protpaths-(?P<node1>[0-9]+))\-(?P<node2>[0-9]+)", entry["aaaModLR"]["attributes"]["dn"])
             global pod
-            pod = r4.group("pod")
             global node1
-            node1 = r4.group("node1")
             global node2
-            node2 = r4.group("node2")
+            if r4 is not None:
+                pod = r4.group("pod")
+                node1 = r4.group("node1")
+                node2 = r4.group("node2")
             if r5 is not None:
                 if r5.group("l3VPC") in entry ["aaaModLR"]["attributes"]["dn"] and isinstance(l3VPC, str):
                     entry["aaaModLR"]["attributes"]["dn"] = re.sub("rspathL3OutAtt-\[[^]]+\]", "rspathL3OutAtt-[%s" % l3VPC, entry["aaaModLR"]["attributes"]["dn"])
