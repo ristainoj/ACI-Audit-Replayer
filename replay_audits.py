@@ -1259,15 +1259,15 @@ def main(file, ip, username, password, https, port, waitTime, step, xml, json, c
         "9": allFlt
     }
 
-    print "[1]: All Global Tenant Config"
-    print "[2]: All Tenant Config"
-    print "[3]: All VRF Config"
-    print "[4]: All L3Out Config"
-    print "[5]: All App Profile Config"
-    print "[6]: All EPG Config"
-    print "[7]: All BD Config"
-    print "[8]: All Con Config"
-    print "[9]: All Flt Config"
+    print "[1]: All Audits"
+    print "[2]: All Tenant Audits (fvTenant parent only)"
+    print "[3]: All VRF Audits"
+    print "[4]: All L3Out Audits"
+    print "[5]: All App Profile Audits"
+    print "[6]: All EPG Audits"
+    print "[7]: All BD Audits"
+    print "[8]: All Con Audits"
+    print "[9]: All Flt Audits"
 
     selection = None
     while selection is None:
