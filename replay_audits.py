@@ -892,7 +892,7 @@ def reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC):
 
     return entry
 
-def replayAudits(session, selection, audits, waitTime, step, vmm, phys, port, l3If, l3PC, l3VPC, catalog):
+def replayAudits(session, selection, audits, waitTime, step, vmm, phys, port, l3If, l3PC, l3VPC, catalog, remap):
 
     if waitTime and step:
         wait = 0
@@ -936,33 +936,33 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, port, l3
         print "unable to find event codes in catalog %s" % from_apic
         sys.exit(1)
 
+    if remap:
+        if "1" in selection or "6" in selection:
+            if vmm == True:
+                vmmDom = getVMMUserInfo(session)
+            if phys == True or port == True:
+                phyDom, port = getPhyUserInfo(session)
+        else:
+            vmm = False
+            phys = False
+            port = False
 
-    if "1" in selection or "6" in selection:
-        if vmm == True:
-            vmmDom = getVMMUserInfo(session)
-        if phys == True or port == True:
-            phyDom, port = getPhyUserInfo(session)
-    else:
-        vmm = False
-        phys = False
-        port = False
+        if "1" in selection or "4" in selection:
+            l3Dom, l3If, l3PC, l3VPC = getL3UserInfo(session, l3If, l3PC, l3VPC)
+        else:
+            l3Dom = False
+            l3If = False
+            l3PC = False
+            l3VPC = False
 
-    if "1" in selection or "4" in selection:
-        l3Dom, l3If, l3PC, l3VPC = getL3UserInfo(session, l3If, l3PC, l3VPC)
-    else:
-        l3Dom = False
-        l3If = False
-        l3PC = False
-        l3VPC = False
-
-    if "2" in selection or "3" in selection or "5" in selection or "7" in selection or "8" in selection or "9" in selection:
-        vmm = False
-        phys = False
-        port = False
-        l3Dom = False
-        l3If = False
-        l3PC = False
-        l3VPC = False
+        if "2" in selection or "3" in selection or "5" in selection or "7" in selection or "8" in selection or "9" in selection:
+            vmm = False
+            phys = False
+            port = False
+            l3Dom = False
+            l3If = False
+            l3PC = False
+            l3VPC = False
 
     for entry in audits:
         try:
@@ -970,7 +970,8 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, port, l3
             print prettyPrint
             if entry["aaaModLR"]["attributes"]["ind"] == "creation" or entry["aaaModLR"]["attributes"]["ind"] == "deletion":
                 r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
-                for object in range(0, len(reMapObjects)):
+                if remap:
+                    for object in range(0, len(reMapObjects)):
                         if reMapObjects[object] in r2.group("url"):
                             if (vmm and phys and l3If and l3PC and l3VPC):
                                 entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
@@ -1042,7 +1043,6 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, port, l3
                     r3 = re.finditer("(?P<key>[^:, ]+):(?P<value>[^,]+)", entry["aaaModLR"]["attributes"]["changeSet"])
                     for m in r3:
                         attributes[m.group("key")] = m.group("value")
-                    #r4 = re.search("(?P<class>^\S*)", entry["aaaModLR"]["attributes"]["descr"])
                     code = re.sub("^E","", entry["aaaModLR"]["attributes"]["code"])
                     if code in codes:
                         className = codes[code]
@@ -1086,6 +1086,7 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, port, l3
             elif entry["aaaModLR"]["attributes"]["ind"] == "modification":
                 r2 = re.search("(?P<url>uni.*(?=]))", entry["aaaModLR"]["attributes"]["dn"])
                 for object in range(0, len(reMapObjects)):
+                    if remap:
                         if reMapObjects[object] in r2.group("url"):
                             if (vmm and phys and l3If and l3PC and l3VPC):
                                 entry = reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC)
@@ -1199,7 +1200,7 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, port, l3
             continue
 
 
-def main(file, ip, username, password, https, port, waitTime, step, xml, json, catalog, start_time, end_time, tenant):
+def main(file, ip, username, password, https, port, waitTime, step, xml, json, catalog, start_time, end_time, tenant, remap):
 
     # Get Connection Info From User and Build a Session Object to APIC
     session = env_setup(ip, username, password, https, port)
@@ -1278,7 +1279,7 @@ def main(file, ip, username, password, https, port, waitTime, step, xml, json, c
     print "\n"
 
 
-    replayAudits(session, selection, selections[selection], waitTime, step, vmm, phys, port, l3If, l3PC, l3VPC, catalog)
+    replayAudits(session, selection, selections[selection], waitTime, step, vmm, phys, port, l3If, l3PC, l3VPC, catalog, remap)
 
 
 if __name__ == "__main__":
@@ -1304,6 +1305,7 @@ if __name__ == "__main__":
     parser.add_argument("--step", action="store_true", dest="step",help="Prompt For User input between each step", default=None)
     parser.add_argument("--debug", action="store", help="debug level", dest="debug", default="ERROR")
     parser.add_argument("--tenant", action="store", help="Tenant You Wish to Replay Audits For", dest="tenant", default=None)
+    parser.add_argument("--remap", action="store_true", help="Set if you would like to remap objects to new ones", dest="remap", default=None)
     args = parser.parse_args()
 
     start_time = args.startTime
@@ -1339,7 +1341,13 @@ if __name__ == "__main__":
     if args.debug == "WARN": logger.setLevel(logging.WARN)
     if args.debug == "ERROR": logger.setLevel(logging.ERROR)
 
+    if ".xml" in args.file and not args.xml:
+        print "XML argument must be set for xml file"
+        sys.exit(0)
+    elif ".json" in args.file and not args.json:
+        print "JSON argument must be set for json file"
+        sys.exit(0)
 
     main(args.file, args.ip, args.username, args.password, args.https, args.port, args.time, args.step, args.xml,
-        args.json, args.catalog, start_time, end_time, args.tenant)
+        args.json, args.catalog, start_time, end_time, args.tenant, args.remap)
 
