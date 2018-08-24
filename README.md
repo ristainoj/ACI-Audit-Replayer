@@ -23,16 +23,23 @@ optional arguments:
   --port PORT           port number to use for APIC communicaton
   --catalog CATALOG     manually specify MESSAGE-CATALOG.txt from version of
                         code audits were pulled from
-  --startTime STARTTIME Time to begin deploying Audits. Must be in the
+  --startTime STARTTIME
+                        Time to begin deploying Audits. Must be in the
                         following Format: YYYY-MM-DDTHH:MM:SS
   --endTime ENDTIME     Time to Stop deploying Audits. Must be in the
                         following Format: YYYY-MM-DDTHH:MM:SS
   --waitTime TIME       Time in seconds to wait between changes
   --step                Prompt For User input between each step
   --debug DEBUG         debug level
+  --tenant TENANT       Tenant You Wish to Replay Audits For
+  --remap               Set if you would like to remap objects to new ones
   
   The Script detects what config changes have been made and will prompt you for interfaces and domains to use to "replace" when the config is pushed.
   This way you can run the script on any fabric and use interfaces/domains from that Fabric against any Audit Log.
+  
+  The original idea was to take audits and replay them in "any" lab environment.  In order to accomplish this, some objects need to be "re-mapped" to objects that exist in the setup you are deploying them on.  An example of this is a static path binding.  The leaf node and interface where the audit was done may not exist in the lab you are deploying.  The "--remap" argument should be used in this case to be prompted for input for any objects that will need remapping.  By default, it will try and push the audit as is.
+  
+  
   ```
 
 # Caveats:
