@@ -331,44 +331,49 @@ def getL3UserInfo(session, l3If=False, l3PC=False, l3VPC=False):
         l3If = getL3Int(session)
         l3PC = getL3PC(session)
         l3VPC = getL3VPC(session)
+        return str(l3Dom), str(l3If), str(l3PC), str(l3VPC)
 
     elif l3_type == "If-PC":
         print "Since Routed Ints/SubInts, and PCs are used, we will need to select all options for replacement"
         l3If = getL3Int(session)
         l3PC = getL3PC(session)
         l3VPC = False
+        return str(l3Dom), str(l3If), str(l3PC), l3VPC
 
     elif l3_type == "If-VPC":
         print "Since Routed Ints/SubInts, and VPCs are used, we will need to select all options for replacement"
         l3If = getL3Int(session)
         l3PC = False
         l3VPC = getL3VPC(session)
+        return str(l3Dom), str(l3If), l3PC, str(l3VPC)
 
     elif l3_type == "If":
         print "Since Routed Ints/SubInts are used, we will need to select all options for replacement"
         l3If = getL3Int(session)
         l3PC = False
         l3VPC = False
+        return str(l3Dom), str(l3If), l3PC, l3VPC
 
     elif l3_type == "PC-SVI":
         print "Since PCs and VPCs are used, we will need to select all options for replacement"
         l3If = False
         l3PC = getL3PC(session)
         l3VPC = getL3VPC(session)
+        return str(l3Dom), l3If, str(l3PC), str(l3VPC)
 
     elif l3_type == "PC":
         print "Since PCs are used, we will need to select which PC for replacement"
         l3If = False
         l3PC = getL3PC(session)
         l3VPC = False
+        return str(l3Dom), l3If, str(l3PC), l3VPC
 
     elif l3_type == "VPC":
         print "Since VPCs are used, we will need to select which VPC to use for replacement"
         l3If = False
         l3PC = False
         l3VPC = getL3VPC(session)
-
-    return str(l3Dom), str(l3If), str(l3PC), str(l3VPC)
+        return str(l3Dom), l3If, l3PC, str(l3VPC)
 
 
 def getL3PC(session):
@@ -880,6 +885,15 @@ def reMap(entry, vmmDom, phyDom, port, l3Dom, l3If, l3PC, l3VPC):
                     entry["aaaModLR"]["attributes"]["affected"] = re.sub("rspathL3OutAtt-\[[^]]+\]", "rspathL3OutAtt-[%s" % l3VPC, entry["aaaModLR"]["attributes"]["affected"])
 
     if reMapObjects[5] in entry["aaaModLR"]["attributes"]["dn"]:
+        if l3If:
+            r6 = re.search("topology\/pod-(?P<pod>[0-9]+)\/paths-(?P<node>[0-9]+)", l3If)
+            if r6 is not None:
+                l3IfPod = r6.group("pod")
+                l3IfNode = r6.group("node")
+                entry["aaaModLR"]["attributes"]["dn"] = re.sub("rsnodeL3OutAtt-\[topology\/pod-[0-9]\/node-[^]]+", "rsnodeL3OutAtt-[topology/pod-%s/node-%s" % (l3IfPod, l3IfNode), entry["aaaModLR"]["attributes"]["dn"])
+                entry["aaaModLR"]["attributes"]["changeSet"] = re.sub("tDn:topology\/pod-[0-9]\/node-[^ ,]+", "tDn:topology/pod-%s/node-%s" % (l3IfPod, l3IfNode), entry["aaaModLR"]["attributes"]["changeSet"])
+                entry["aaaModLR"]["attributes"]["affected"] = re.sub("rsnodeL3OutAtt-\[topology\/pod-[0-9]\/node-[^]]+", "rsnodeL3OutAtt-[topology/pod-%s/node-%s" % (l3IfPod, l3IfNode), entry["aaaModLR"]["attributes"]["affected"])
+
         if l3VPC:
             entry["aaaModLR"]["attributes"]["dn"] = re.sub("rsnodeL3OutAtt-\[topology\/pod-[0-9]\/node-[^]]+", "rsnodeL3OutAtt-[topology/pod-%s/node-%s" % (pod, node1), entry["aaaModLR"]["attributes"]["dn"])
             entry["aaaModLR"]["attributes"]["changeSet"] = re.sub("tDn:topology\/pod-[0-9]\/node-[^ ,]+", "tDn:topology/pod-%s/node-%s" % (pod, node1), entry["aaaModLR"]["attributes"]["changeSet"])
@@ -948,7 +962,8 @@ def replayAudits(session, selection, audits, waitTime, step, vmm, phys, port, l3
             port = False
 
         if "1" in selection or "4" in selection:
-            l3Dom, l3If, l3PC, l3VPC = getL3UserInfo(session, l3If, l3PC, l3VPC)
+            if l3If or l3PC or l3VPC:
+                l3Dom, l3If, l3PC, l3VPC = getL3UserInfo(session, l3If, l3PC, l3VPC)
         else:
             l3Dom = False
             l3If = False
